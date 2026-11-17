@@ -921,7 +921,7 @@ function falarParte(texto){const q=V.fila;if(!q||q.fid!==V.falaId)return;texto=l
   q.dito+=(q.dito?' ':'')+texto;V.falaTexto=norm(q.dito);const A=ACT[q.id];if(A)showBubble(A,q.dito,Math.min(30000,4000+q.dito.length*70));
   q.itens.push({texto,audio:audioDe(q.id,texto)});if(!q.tocando)tocarProximo()}
 function falarFim(depois){const q=V.fila;if(!q||q.fid!==V.falaId)return;q.acabou=true;q.depois=depois||null;if(!q.tocando&&!q.itens.length)falaTerminou(q)}
-function falaTerminou(q){if(q.fid!==V.falaId||q.gen!==V.gen)return;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+500;V.userAt=Date.now();const d=q.depois;q.depois=null;d&&d()}
+function falaTerminou(q){if(q.fid!==V.falaId||q.gen!==V.gen)return;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+1300;V.fimFala=Date.now();V.userAt=Date.now();const d=q.depois;q.depois=null;d&&d()}
 async function tocarProximo(){const q=V.fila;if(!q||q.fid!==V.falaId)return;const it=q.itens.shift();
   if(!it){q.tocando=false;if(q.acabou)falaTerminou(q);return}q.tocando=true;
   const proximo=()=>{if(q.fid===V.falaId&&q.gen===V.gen)tocarProximo()};
@@ -1004,7 +1004,12 @@ function onRoomChange(prev,now){
 /* ouvir o tempo todo. Você terminou de falar quando fica ~0,9 s em silêncio (não espera o navegador fechar a frase).
    Enquanto o agente fala, o que o microfone pega só serve para cortar a fala dele. */
 const FALA_ABERTA=/(^|\s)(e|que|pra|para|de|do|da|dos|das|com|mas|porque|entao|tipo|o|a|os|as|um|uma|se|quando|como|no|na|em|ou|ai|tambem|sobre|onde|qual|quem|mais|tipo assim|assim|eh|hum|ahn)\s*[,.]?$/;
-function ouviu(t){if(Date.now()<(V.mudoAte||0))return;if(V.agent)setSay('');
+// O microfone também ouve a voz do agente saindo da caixa de som e às vezes manda isso alguns segundos depois.
+// Se o que chegou é praticamente o que ele acabou de falar, é eco: descarta.
+function ecoAtrasado(t){if(!V.agent||!V.fimFala||!V.falaTexto)return false;const dt=Date.now()-V.fimFala;if(dt>9000)return false;
+  const w=norm(t).split(/[^a-z0-9]+/).filter(x=>x.length>2);if(!w.length)return dt<4000;
+  if(w.length<=2)return dt<6000&&ehEco(t)>=.99;return ehEco(t)>=.7}
+function ouviu(t){if(Date.now()<(V.mudoAte||0))return;if(ecoAtrasado(t)){if(V.agent)setSay('');return}if(V.agent)setSay('');
   if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Johnny, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}
 function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
   if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;const feitos=new Set();
