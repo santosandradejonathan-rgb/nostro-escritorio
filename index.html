@@ -857,17 +857,26 @@ function falarNavegador(id,texto,fim){const v=vozDe(id),cfg=VOZ[id]||{};const pa
   if(!partes.length||!window.speechSynthesis){fim();return}V.utts=[];
   partes.forEach((f,k)=>{const u=new SpeechSynthesisUtterance(f);u.lang='pt-BR';if(v)u.voice=v;u.pitch=cfg.pitch||1;u.rate=cfg.rate||1.05;
     if(k===partes.length-1){u.onend=fim;u.onerror=fim}V.utts.push(u);speechSynthesis.speak(u)})}
-function falar(id,texto,depois){const gen=V.gen;pararAudio();texto=limpaFala(texto);if(!texto){depois&&depois();return}
+function falar(id,texto,depois){const gen=V.gen;pararAudio();texto=limpaFala(texto);if(!texto){depois&&depois();return}const fid=V.falaId=(V.falaId||0)+1;V.falaTexto=norm(texto);
   const A=ACT[id];V.mode='speaking';V.falando=true;if(A)showBubble(A,texto,Math.min(25000,3000+texto.length*65));
-  let feito=false;const fim=()=>{if(feito||gen!==V.gen)return;feito=true;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+700;V.userAt=Date.now();depois&&depois()};
-  const plano=()=>{if(gen===V.gen&&!feito)falarNavegador(id,texto,fim)};
+  let feito=false;const fim=()=>{if(feito||gen!==V.gen||fid!==V.falaId)return;feito=true;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+700;V.userAt=Date.now();depois&&depois()};
+  const plano=()=>{if(gen===V.gen&&!feito&&fid===V.falaId)falarNavegador(id,texto,fim)};
   if(V.semAzure){plano();return}
   fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto})})
-    .then(async r=>{if(gen!==V.gen)return;if(!r.ok){if(r.status===503)V.semAzure=true;plano();return}
-      const b=await r.blob();if(gen!==V.gen)return;const url=URL.createObjectURL(b);const au=new Audio(url);AUD=au;
+    .then(async r=>{if(gen!==V.gen||fid!==V.falaId)return;if(!r.ok){if(r.status===503)V.semAzure=true;plano();return}
+      const b=await r.blob();if(gen!==V.gen||fid!==V.falaId)return;const url=URL.createObjectURL(b);const au=new Audio(url);AUD=au;
       au.onended=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;fim()};au.onerror=()=>{if(AUD===au)AUD=null;plano()};
       au.play().catch(()=>{if(AUD===au)AUD=null;plano()})})
     .catch(()=>plano())}
+/* cortar o agente no meio da fala: pela voz (palavra de parada ou o nome dele) ou pela tecla Esc */
+const PARADA=/(^| )(espera|espere|pera|perai|peraí|calma|chega|para|pare|deixa|entendi|ta bom|beleza|ok|mas|so um minuto|um minuto|opa|o )( |$)/;
+function ehEco(t){const w=norm(t).split(/[^a-z0-9]+/).filter(x=>x.length>2);if(!w.length)return 1;const f=V.falaTexto||'';return w.filter(x=>f.includes(x)).length/w.length}
+function querCortar(t){if(!V.falando)return false;const n=norm(t).replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();if(!n)return false;
+  const eco=ehEco(t);const nome=V.agent&&nameIn(t)===V.agent;const palavras=n.split(' ').length;
+  if((PARADA.test(n)||nome)&&eco<.6)return true;return palavras>=4&&eco<.3}
+function interromper(){if(!V.falando)return;V.falaId=(V.falaId||0)+1;pararAudio();V.falando=false;V.mode='listening';V.mudoAte=0;V.userAt=Date.now();
+  const A=ACT[V.agent];if(A&&A.bubble){A.p.root.remove(A.bubble);A.bubble=null}
+  if(V.sess&&V.sess.msgs.length){const m=V.sess.msgs[V.sess.msgs.length-1];if(m.role==='assistant'&&!/\(interrompido\)$/.test(m.content))m.content+=' (interrompido)'}}
 function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a)return;
   if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening'}
@@ -908,9 +917,11 @@ function onRoomChange(prev,now){
   for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
 /* ouvir o tempo todo; enquanto o agente fala, o que o microfone pega é ignorado (é a própria voz dele) */
 function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
-  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=false;V.rec=r;
-  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){if(!ev.results[i].isFinal)continue;const t=ev.results[i][0].transcript.trim();if(t.length<2)continue;
-    if(V.falando||Date.now()<(V.mudoAte||0))continue;
+  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;
+  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const t=ev.results[i][0].transcript.trim();if(t.length<2)continue;
+    if(V.falando){if(querCortar(t)){interromper();if(!ev.results[i].isFinal)continue}else continue}
+    if(!ev.results[i].isFinal)continue;
+    if(Date.now()<(V.mudoAte||0))continue;
     if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Calebe, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}};
   r.onend=()=>{V.rec=null;if(V.recWanted)setTimeout(startNameListening,300)};
   r.onerror=e=>{if(e.error==='not-allowed'){V.recWanted=false;setSay('Permita o microfone para conversar com o time.')}};
@@ -939,7 +950,7 @@ function walkToAgent(id){const A=ACT[id];if(!A)return;S.dismissed=null;setFree(f
 const typing=()=>{const el=document.activeElement;return el&&(el.tagName==='TEXTAREA'||el.tagName==='INPUT'||el.tagName==='SELECT')};
 const KEYS={ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,w:1,a:1,s:1,d:1};
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){document.activeElement&&document.activeElement.blur();return}
+  if(e.key==='Escape'){if(V.falando){interromper();return}document.activeElement&&document.activeElement.blur();return}
   if(typing())return;if(S.edit&&S.sel&&(e.key==='r'||e.key==='R')){rotateSel(e.shiftKey?-Math.PI/4:Math.PI/4);return}if(S.edit&&e.key==='Escape'){setEdit(false);return}const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k]){audio();S.keys[k]=true;e.preventDefault()}
 });
 document.addEventListener('keyup',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k])S.keys[k]=false});
@@ -1136,7 +1147,7 @@ async function startMulti(){
     addEventListener('beforeunload',()=>{try{ch.untrack();sb.removeChannel(ch)}catch(e){}});
   }catch(e){console.warn('multi',e)}}
 
-window.__nostro={get V(){return V},get M(){return M},get S(){return S},get ME(){return ME},ACT,onHeard,startVoice,endVoice};
+window.__nostro={get V(){return V},get M(){return M},get S(){return S},get ME(){return ME},ACT,onHeard,startVoice,endVoice,querCortar,interromper};
 const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('tempo')),ms))]);
 async function enterOffice(){
   if($('enter').disabled)return;const nm=($('myname').value||'').trim().replace(/\s+/g,' ');if(!nm){$('myname').focus();toast('Escreva seu nome para o time saber quem chegou.');return}
