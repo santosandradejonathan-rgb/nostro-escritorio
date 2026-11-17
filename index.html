@@ -220,7 +220,8 @@ const ICON={
 /* ================= planta (metros) ================= */
 const WX=40,WZ=28,R=0.32;
 const ROOMS=[
-  {id:'comercial',nome:'Sala Comercial',x0:0,z0:0,x1:14,z1:9,door:true},
+  {id:'comercial',nome:'Sala Comercial',x0:0,z0:0,x1:7,z1:9,door:true},
+  {id:'estudio',nome:'Estúdio',x0:7,z0:0,x1:14,z1:9,door:true},
   {id:'jonathan',nome:'Sala do Jonathan',x0:14,z0:0,x1:21,z1:9,door:true},
   {id:'stephanie',nome:'Sala da Stephanie',x0:21,z0:0,x1:28,z1:9,door:true},
   {id:'reuniao',nome:'Sala de Reunião',x0:28,z0:0,x1:40,z1:9,door:true},
@@ -235,14 +236,14 @@ const WALLS=[],COLS=[],DOORS=[];
 function wallH(z,x0,x1,gaps=[]){let x=x0;for(const [a,b] of gaps.concat([[x1,x1]])){if(a>x)WALLS.push([x,z-.1,a,z+.1]);x=b}}
 function wallV(x,z0,z1,gaps=[]){let z=z0;for(const [a,b] of gaps.concat([[z1,z1]])){if(a>z)WALLS.push([x-.1,z,x+.1,a]);z=b}}
 const DOORDEF=[ // [x0,x1,z,tipo]
-  [6,7.4,9,'vidro'],[16.8,18.2,9,'vidro'],[23.8,25.2,9,'vidro'],[33,34.4,9,'vidro'],
+  [2.8,4.2,9,'vidro'],[9.8,11.2,9,'vidro'],[16.8,18.2,9,'vidro'],[23.8,25.2,9,'vidro'],[33,34.4,9,'vidro'],
   [5,6.4,12,'vidro'],[25,26.4,12,'vidro'],[34,35.4,12,'vidro'],[16.3,17.7,26,'principal']
 ];
 wallH(0,0,40);wallV(0,0,26);wallV(40,0,26);
 wallH(26,0,40,[[16.3,17.7]]);
-wallH(9,0,40,[[6,7.4],[16.8,18.2],[23.8,25.2],[33,34.4]]);
+wallH(9,0,40,[[2.8,4.2],[9.8,11.2],[16.8,18.2],[23.8,25.2],[33,34.4]]);
 wallH(12,0,40,[[5,6.4],[12.6,14.4],[19.6,21.4],[25,26.4],[34,35.4]]);
-wallV(14,0,9);wallV(21,0,9);wallV(28,0,9);wallV(12,12,26);wallV(22,12,26);wallV(30,12,26);
+wallV(7,0,9);wallV(14,0,9);wallV(21,0,9);wallV(28,0,9);wallV(12,12,26);wallV(22,12,26);wallV(30,12,26);
 const col=(x0,z0,x1,z1)=>COLS.push([Math.min(x0,x1),Math.min(z0,z1),Math.max(x0,x1),Math.max(z0,z1)]);
 
 /* ================= time ================= */
@@ -328,6 +329,31 @@ function pendant(x,z,y,int){C(.006,.006,3-y,MAT.black,x,y+(3-y)/2,z,null,6);cons
   const bulb=new THREE.Mesh(new THREE.SphereGeometry(.06,12,8),new THREE.MeshBasicMaterial({color:0xffe2b0}));bulb.position.set(x,y-.08,z);scene.add(bulb);
   if(int){const L=new THREE.PointLight(0xffd6a0,int,10,2);L.position.set(x,y-.2,z);scene.add(L)}}
 function tv(x,z,w,rot,y){const g=grp(x,z,rot);B(w,w*.56,.06,MAT.lacquer,0,y||1.5,0,g);B(w-.08,w*.56-.08,.005,new THREE.MeshStandardMaterial({color:0x0b0e16,emissive:0x1d2a4a,emissiveIntensity:.5,roughness:.15}),0,y||1.5,.033,g,{noShadow:true});return g}
+// TV de vendas: um painel que se redesenha sozinho (gráfico de barras, linha e números do mês)
+const TVV={cv:null,ctx:null,tex:null,t:0,serie:[],linha:[]};
+function tvVendas(x,z,w){const h=w*.56,g=grp(x,z,0);B(w+.08,h+.08,.06,MAT.lacquer,0,1.75,0,g);
+  const cv=document.createElement('canvas');cv.width=1024;cv.height=576;TVV.cv=cv;TVV.ctx=cv.getContext('2d');
+  TVV.tex=new THREE.CanvasTexture(cv);TVV.tex.colorSpace=THREE.SRGBColorSpace;
+  const tela=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:TVV.tex,toneMapped:false}));tela.position.set(0,1.75,.035);g.add(tela);
+  const L=new THREE.PointLight(0x7fa8ff,4,4,2);L.position.set(0,1.75,.6);g.add(L);
+  for(let i=0;i<12;i++)TVV.serie.push(40+Math.random()*50);for(let i=0;i<24;i++)TVV.linha.push(30+i*2.2+Math.random()*12);
+  desenharTV(0);return g}
+function desenharTV(t){const c=TVV.ctx;if(!c)return;const W=1024,H=576,ouro='#C9A45C',cinza='#8a8f9c';
+  c.fillStyle='#0b0d13';c.fillRect(0,0,W,H);
+  c.fillStyle=ouro;c.font='700 30px Manrope, sans-serif';c.fillText('NOSTRO · VENDAS DO MÊS',40,56);
+  c.fillStyle=cinza;c.font='500 20px Manrope, sans-serif';const hora=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});c.fillText('ao vivo · '+hora,W-190,56);
+  const fat=184+Math.round(t*.7)%40,kp=[['Faturamento','R$ '+fat+' mil','+12%'],['Leads','1.'+(240+Math.round(t)%60),'+8%'],['Reuniões',String(38+Math.round(t/9)%6),'+5'],['Fechamentos',String(11+Math.round(t/23)%3),'+2']];
+  kp.forEach(([n,v,d],i)=>{const x=40+i*240;c.fillStyle='#151925';c.fillRect(x,82,220,108);c.fillStyle=cinza;c.font='500 20px Manrope, sans-serif';c.fillText(n,x+16,114);
+    c.fillStyle='#f3efe6';c.font='800 36px Manrope, sans-serif';c.fillText(v,x+16,160);c.fillStyle='#4fc38a';c.font='700 18px Manrope, sans-serif';c.fillText(d,x+16,182)});
+  // barras (vendas por mês)
+  const bx=40,by=230,bw=470,bh=300;c.fillStyle='#151925';c.fillRect(bx,by,bw,bh);c.fillStyle=cinza;c.font='500 18px Manrope, sans-serif';c.fillText('Vendas por mês',bx+16,by+30);
+  TVV.serie.forEach((v,i)=>{const alvo=v+Math.sin(t*.8+i)*6,hh=alvo/100*(bh-80),x=bx+20+i*37;c.fillStyle=i===11?ouro:'#3b4560';c.fillRect(x,by+bh-24-hh,26,hh)});
+  // linha (funil acumulado)
+  const lx=530,ly=230,lw=454,lh=300;c.fillStyle='#151925';c.fillRect(lx,ly,lw,lh);c.fillStyle=cinza;c.fillText('Pipeline acumulado',lx+16,ly+30);
+  c.strokeStyle='#26304a';c.lineWidth=1;for(let k=1;k<5;k++){c.beginPath();c.moveTo(lx+16,ly+40+k*48);c.lineTo(lx+lw-16,ly+40+k*48);c.stroke()}
+  c.strokeStyle=ouro;c.lineWidth=4;c.beginPath();TVV.linha.forEach((v,i)=>{const vv=v+Math.sin(t*.6+i*.5)*4,x=lx+20+i*(lw-40)/23,y=ly+lh-24-vv/100*(lh-80);i?c.lineTo(x,y):c.moveTo(x,y)});c.stroke();
+  const pi=Math.floor(t*2)%24,v=TVV.linha[pi]+Math.sin(t*.6+pi*.5)*4;c.fillStyle='#fff';c.beginPath();c.arc(lx+20+pi*(lw-40)/23,ly+lh-24-v/100*(lh-80),7,0,Math.PI*2);c.fill();
+  TVV.tex.needsUpdate=true}
 function textPlane(text,w,h,opts){const o=Object.assign({font:'400 150px "Instrument Serif"',color:'#C9A45C',bg:null,spacing:24,sub:null},opts);
   const t=canvasTex(2048,Math.round(2048*h/w),(g,cw,ch)=>{if(o.bg){g.fillStyle=o.bg;g.fillRect(0,0,cw,ch)}g.fillStyle=o.color;g.textAlign='center';g.textBaseline='middle';g.font=o.font;
     if('letterSpacing' in g)g.letterSpacing=o.spacing+'px';g.fillText(text,cw/2,o.sub?ch*.44:ch/2);
@@ -433,7 +459,7 @@ function makeDoors(){
 function buildWorld(){
   // pisos
   const floors=[
-    ['comercial',woodTex('#6b4630','#2a170c',31),[3.5,2.25]],['jonathan',carpetTex('#2b2c31',41),[6,8]],['stephanie',carpetTex('#5b4a46',43),[6,8]],
+    ['comercial',woodTex('#6b4630','#2a170c',31),[1.75,2.25]],['estudio',carpetTex('#1d1d22',33),[4,5]],['jonathan',carpetTex('#2b2c31',41),[6,8]],['stephanie',carpetTex('#5b4a46',43),[6,8]],
     ['reuniao',carpetTex('#24262b',45),[8,6]],['corredor',marbleTex('#ebe7e0','#8c867c',47),[8,1]],['equipe',woodTex('#9b7450','#4a2f1a',49),[3,3.5]],
     ['recepcao',marbleTex('#f2efe9','#7a746a',51),[2.5,3.5]],['cozinha',marbleTex('#d9d4cb','#5d574d',53),[2,3.5]],['jogos',carpetTex('#1f2a27',55),[8,10]],['entrada',carpetTex('#3a3936',57),[4,1]]
   ];
@@ -458,15 +484,23 @@ function buildWorld(){
   const rail=new THREE.Mesh(new THREE.BoxGeometry(8,1.1,.04),MAT.glass);rail.position.set(17,.55,28.05);scene.add(rail);B(8,.05,.08,MAT.gold,17,1.1,28.05,null,{noShadow:true});
   makeDoors();
 
-  // ---------- Sala Comercial ----------
-  rug(7,4.8,11,4.6,'#2b3440',true);
-  // bancadas dos agentes (cadeiras e notebooks entram com os agentes)
-  shelf(.45,4.5,2.4,Math.PI/2);plant(.7,.7,1.2);plant(13.3,.7,1.1);plant(13.3,8.3,1);
-  floorLabel('SALA COMERCIAL',3,8.4,3.6);
-  const board=new THREE.Group();board.position.set(7,0,.35);scene.add(board);B(3.4,1.4,.06,MAT.lacquer,0,1.9,0,board);
-  const bt=textPlane('META DO MÊS',3.1,.5,{font:'700 120px Manrope',color:'#C9A45C',spacing:30});bt.position.set(0,2.35,.035);board.add(bt);
-  const bars=[.35,.5,.62,.9];bars.forEach((h,i)=>B(.32,h,.02,i===3?MAT.gold:MAT.cream,-.8+i*.55,1.3+h/2,.04,board,{noShadow:true}));
-  C(.03,.03,1.2,MAT.black,-1.5,.6,0,board,8);C(.03,.03,1.2,MAT.black,1.5,.6,0,board,8);col(5.2,.1,8.8,.6);
+  // ---------- Sala Comercial (2 pessoas) ----------
+  rug(3.5,4.4,6,4.4,'#2b3440',true);
+  // 2 estações: a do Calebe entra com ele; a segunda fica pronta para quem vier trabalhar junto
+  if(S.agents.length<2||!AGENTS[1]){desk(5.1,3.6,2.3,1,0,MAT.walnutTop);chair(5.1,2.75,0,MAT.leather)}
+  plant(.6,8.35,1.1);plant(6.4,8.35,1);pendant(3.5,3.6,2.5,0);
+  floorLabel('SALA COMERCIAL',3.5,8.1,3);
+  // TV na parede de trás, com os números de vendas passando
+  tvVendas(3.5,.1,3.4);col(1.6,.02,5.4,.22);
+
+  // ---------- Estúdio (audiovisual) ----------
+  rug(10.5,4.6,5.6,5,'#26262c',true);
+  {const f=new THREE.Group();f.position.set(10.5,0,.25);scene.add(f);B(4.2,2.7,.04,MAT.cream,0,1.35,0,f);const cv=new THREE.Mesh(new THREE.CylinderGeometry(.6,.6,4.2,24,1,true,0,Math.PI/2),MAT.cream);cv.rotation.z=Math.PI/2;cv.rotation.y=Math.PI;cv.position.set(0,.6,.6);f.add(cv);B(4.2,.02,1.2,MAT.cream,0,.01,1.2,f,{noShadow:true});col(8.3,.1,12.7,1.9)}
+  for(const [lx,lz,ry] of [[8.4,3.4,.6],[12.6,3.4,-.6]]){const g=grp(lx,lz,ry);C(.02,.02,1.7,MAT.black,0,.85,0,g,8);for(let i=0;i<3;i++){const l=B(.5,.02,.03,MAT.black,0,.04,0,g);l.rotation.y=i*2.1}
+    const sb=B(.55,.45,.35,MAT.lacquer,0,1.85,-.05,g);const fr=new THREE.Mesh(new THREE.PlaneGeometry(.5,.4),new THREE.MeshBasicMaterial({color:0xfff4e0}));fr.position.set(0,1.85,-.23);fr.rotation.y=Math.PI;g.add(fr);col(lx-.3,lz-.3,lx+.3,lz+.3)}
+  {const g=grp(10.5,4.4,Math.PI);C(.015,.015,1.4,MAT.black,0,.7,0,g,8);for(let i=0;i<3;i++){const l=B(.45,.02,.03,MAT.black,0,.04,0,g);l.rotation.y=i*2.1}B(.24,.15,.13,MAT.black,0,1.48,0,g);C(.05,.05,.12,MAT.black,0,1.48,.12,g,16).rotation.x=Math.PI/2;col(10.25,4.15,10.75,4.65)}
+  sofa(10.5,8.1,2.2,Math.PI,MAT.fabric);plant(13.4,.7,1.1);plant(7.6,8.35,.9);
+  floorLabel('ESTÚDIO',10.5,6.6,2.4);
 
   // ---------- Sala do Jonathan ----------
   rug(17.5,4.8,5.4,5.2,'#3a3f4a',true);
@@ -649,9 +683,9 @@ function lookOf(a,i){const r=a.rosto||{};const fem=a.genero==='f';
     pants:fem?'#24222a':'#1c1d22',female:fem,beard:!!r.barba,glasses:!!r.oculos,collar:fem?null:'#e9e4da'}}
 
 /* ================= agentes ================= */
-const SEATS=[[2,3.6],[5.35,3.6],[8.65,3.6],[12,3.6],[3.6,6.6],[10.4,6.6]];
+const SEATS=[[1.9,3.6],[5.1,3.6]];
 const agentLayer=new THREE.Group();const ACT={};
-const POIS=[[25.6,13.45,Math.PI],[27.2,13.45,Math.PI],[34.3,16.05,0],[3,.85,Math.PI],[9.5,.85,Math.PI],[26,25.25,0],[38.9,19.5,Math.PI/2],[33.5,.85,Math.PI],[36.5,25.25,0]];
+const POIS=[[25.6,13.45,Math.PI],[27.2,13.45,Math.PI],[34.3,16.05,0],[3.5,1.1,Math.PI],[26,25.25,0],[38.9,19.5,Math.PI/2],[33.5,.85,Math.PI],[36.5,25.25,0]];
 function renderAgents(){
   agentLayer.clear();agentObjs.splice(0);for(let i=MOV.length-1;i>=0;i--)if(/-agent-/.test(MOV[i].key))MOV.splice(i,1);
   COLS.splice(0,COLS.length,...COLS.filter(c=>!c.agent));
@@ -753,6 +787,7 @@ function loop(now){
   const ppl=[ME,...Object.values(ACT),...Object.values(M.peers).filter(p=>p.seen)];
   for(const d of doorObjs){let near=false;for(const q of ppl)if(Math.hypot(d.cx-q.x,d.z-q.z)<2.1){near=true;break}const target=near?1.45*d.dir:0;d.a+=(target-d.a)*Math.min(1,dt*7);d.pivot.rotation.y=d.a}
   const ct=camTarget();camPos.lerp(ct.pos,Math.min(1,dt*4));camLook.lerp(ct.look,Math.min(1,dt*4));camera.position.copy(camPos);camera.lookAt(camLook);
+  if(TVV.ctx&&t-TVV.t>.5){TVV.t=t;desenharTV(t)}
   checkSurroundings();
   renderer.render(scene,camera);
   requestAnimationFrame(loop);
