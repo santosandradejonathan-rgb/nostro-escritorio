@@ -847,7 +847,7 @@ function vozDe(id){const g=(VOZ[id]||{}).g||'m';if(!VOZES.length)carregaVozes();
   // dois agentes do mesmo gênero: se houver mais de uma voz, cada um fica com uma diferente
   const par=g==='m'?['josue','calebe']:['camila','fernanda'];const i=Math.max(0,par.indexOf(id));
   if(da.length)return da[i%da.length];return VOZES[0]||null}
-function frases(t){return String(t).replace(/\s+/g,' ').match(/[^.!?…]+[.!?…]*\s*/g)||[t]}
+function frases(t){return String(t).replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ').replace(/\s+/g,' ').match(/[^.!?…]+[.!?…]*\s*/g)||[t]}
 function falar(id,texto,depois){const gen=V.gen;try{speechSynthesis.cancel()}catch(e){}
   const v=vozDe(id),cfg=VOZ[id]||{},A=ACT[id];const partes=frases(texto).map(x=>x.trim()).filter(Boolean);
   if(!partes.length||!window.speechSynthesis){depois&&depois();return}
