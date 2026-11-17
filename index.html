@@ -799,7 +799,7 @@ function showBubble(actor,text,ms,mine){if(actor.bubble){actor.p.root.remove(act
   if(ms)actor.bubbleT=setTimeout(()=>{if(actor.bubble===b){actor.p.root.remove(b);actor.bubble=null}},ms)}
 function setSay(t){$('say').textContent=t||''}
 function nameIn(text){const n=norm(text);for(const a of S.agents){const f=norm(first(a.nome));if(f&&new RegExp('(^|[^a-z])'+f+'([^a-z]|$)').test(n))return a.id}return null}
-const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,gen:0};
+const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,userAt:0,gen:0};
 /* memória de cada agente: o que já foi conversado fica guardado neste navegador */
 function memKey(id){return 'nostro.mem.'+id+'.'+norm(M.nome||'jonathan')}
 function memGet(id){try{return JSON.parse(localStorage.getItem(memKey(id))||'[]')}catch(e){return[]}}
@@ -836,7 +836,7 @@ async function startVoice(id,firstText){
   if(V.agent===id&&V.conv){if(firstText){try{V.conv.sendUserMessage(firstText)}catch(e){}}return}
   const gen=++V.gen;V.starting=true;stopNameListening();let answered=false;
   if(V.conv){const old=V.conv;V.conv=null;try{old.setVolume({volume:0})}catch(e){}try{await old.endSession()}catch(e){}}
-  V.agent=id;V.last=id;V.lastAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
+  V.agent=id;V.last=id;V.lastAt=Date.now();V.userAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';const historico=memText(id);
   if(firstText){showBubble(ME,firstText,4000,true);memAdd(id,'u',firstText)}
   try{
@@ -850,7 +850,7 @@ async function startVoice(id,firstText){
       onModeChange:({mode})=>{if(gen===V.gen)V.mode=mode},
       onMessage:m=>{if(gen!==V.gen)return;S.talkAt=Date.now();V.lastAt=Date.now();const A=ACT[id];
         if(m.source==='ai'){answered=true;const txt=String(m.message||'').replace(/\[[^\]]{1,24}\]\s*/g,'').trim();if(!txt)return;memAdd(id,'a',txt);if(A)showBubble(A,txt,Math.min(20000,3000+txt.length*60))}
-        else{if(firstText&&norm(m.message)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
+        else{const um=String(m.message||'').trim();if(!um||/^\.+$/.test(um))return;V.userAt=Date.now();if(firstText&&norm(um)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
           const hu=humanIn(m.message);if(hu)callHuman(hu);
           const other=nameIn(m.message);if(other&&other!==id){
             if(agentRoom(other)===S.room)startVoice(other,m.message);
@@ -869,7 +869,7 @@ function voiceGuard(){
   if(!V.agent)return;const A=ACT[V.agent];
   if(A&&!A.coming&&agentRoom(V.agent)!==S.room){endVoice();return}
   // conversa parada por um tempo fecha sozinha (economiza os minutos da ElevenLabs); é só falar de novo
-  if(V.conv&&V.mode!=='speaking'&&Date.now()-V.lastAt>30000)endVoice()}
+  if(V.conv&&V.mode!=='speaking'&&Date.now()-V.userAt>20000)endVoice()}
 function onRoomChange(prev,now){
   if(V.agent&&agentRoom(V.agent)!==now)endVoice();
   for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
