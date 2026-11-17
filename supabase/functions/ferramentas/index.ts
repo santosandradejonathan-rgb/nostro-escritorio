@@ -10,7 +10,8 @@ const URL_SB = Deno.env.get("SUPABASE_URL") || "";
 const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PERMISSOES: Record<string, string[]> = {
   josue: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "entregar_ao_sdr", "ver_funil"],
-  calebe: ["ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
+  // o Calebe hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
+  calebe: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "adicionar_ao_funil", "ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
 };
 const ETAPAS_SDR = ["novo", "abordado", "followup", "respondeu", "qualificando", "qualificado"];
 const NOME_ETAPA: Record<string, string> = {
@@ -115,22 +116,23 @@ async function buscarEmpresas(a: any) {
 
   // grava na Geração de Leads do Hub, como uma busca feita pelo Josué
   const bid = "ia-" + Date.now().toString(36);
-  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Josué)", local, total: lugares.length, paginas: 1 }) });
+  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Calebe)", local, total: lugares.length, paginas: 1 }) });
   const expira = new Date(Date.now() + 30 * 864e5).toISOString();
   await db("pulse_leads", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify(lugares.map((l: any) => ({ id: l.id, busca_id: bid, data: { ...l, buscadoPor: "josue" }, expira_em: expira }))) });
+    body: JSON.stringify(lugares.map((l: any) => ({ id: l.id, busca_id: bid, data: { ...l, buscadoPor: "calebe" }, expira_em: expira }))) });
   return {
     total: lugares.length, fonte: tt.lugares.length ? "TomTom + OpenStreetMap" : "OpenStreetMap",
+    com_site: lugares.filter((l: any) => l.site).length, com_telefone: lugares.filter((l: any) => l.telefone || l.telefoneIntl).length,
     empresas: lugares.slice(0, 20).map((l: any) => ({ lead_id: l.id, nome: l.nome, categoria: l.categoria, telefone: l.telefone || l.telefoneIntl || "", site: l.site || "", instagram: l.instagram || "", endereco: curto(l.endereco, 90) })),
     obs: "A lista completa ficou salva na Geração de Leads do Hub.",
   };
 }
 async function verLeadsGerados(a: any) {
   const q = sem(a.filtro || "");
-  const r = await db("pulse_leads?select=id,status,data,criado_em&order=criado_em.desc&limit=200");
+  const r = await db("pulse_leads?select=id,status,data,criado_em&order=criado_em.desc&limit=300");
   const lista = ((await r.json().catch(() => [])) as any[]).filter((x) => !x.data?.expirado);
   const f = q ? lista.filter((x) => sem(`${x.data?.nome} ${x.data?.categoria} ${x.data?.cidade}`).includes(q)) : lista;
-  return { total: f.length, leads: f.slice(0, 25).map((x) => ({ lead_id: x.id, nome: x.data?.nome, categoria: x.data?.categoria, cidade: x.data?.cidade, telefone: x.data?.telefone || "", site: x.data?.site || "", instagram: x.data?.instagram || x.data?.siteInfo?.instagram?.[0] || "", no_time_ia: !!x.data?.timeIA, status: x.status })) };
+  return { total: f.length, leads: f.slice(0, 25).map((x) => ({ lead_id: x.id, nome: x.data?.nome, categoria: x.data?.categoria, cidade: x.data?.cidade, telefone: x.data?.telefone || "", site: x.data?.site || "", instagram: x.data?.instagram || x.data?.siteInfo?.instagram?.[0] || "", ja_analisado: !!x.data?.siteInfo, no_funil: !!x.data?.timeIA, status: x.status })) };
 }
 async function analisarSiteF(a: any) {
   let url = curto(a.url, 300), leadRow: any = null;
@@ -142,11 +144,11 @@ async function analisarSiteF(a: any) {
   if (!url) return { erro: "Essa empresa não tem site cadastrado." };
   const s: any = await analisarSite(url);
   if (leadRow) await db(`pulse_leads?id=eq.${encodeURIComponent(leadRow.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ data: { ...leadRow.data, siteInfo: s } }) });
-  return { site: s.url, abriu: s.ok, erro: s.erro || "", instagram: s.instagram, whatsapp: s.whatsapp, emails: s.emails, cnpj: s.cnpjs, pixel_meta: s.pixelMeta, google_tag: s.googleTag, google_ads: s.googleAds, responsivo: s.responsivo, https: s.https, plataforma: s.plataforma, titulo: s.titulo };
+  return { empresa: leadRow?.data?.nome || "", site: s.url, abriu: s.ok, erro: s.erro || "", instagram: s.instagram, whatsapp: s.whatsapp, emails: s.emails, cnpj: s.cnpjs, pixel_meta: s.pixelMeta, google_tag: s.googleTag, google_ads: s.googleAds, responsivo: s.responsivo, https: s.https, plataforma: s.plataforma, titulo: s.titulo };
 }
 async function cnpjF(a: any) { const c: any = await consultarCnpj(a.cnpj); return c; }
-async function entregarAoSdr(a: any) {
-  const sdr = a.sdr === "camila" ? "camila" : "calebe";
+async function entregarAoSdr(a: any, quem = "josue") {
+  const sdr = quem !== "josue" ? quem : a.sdr === "camila" ? "camila" : "calebe";
   const empresa = curto(a.empresa, 120);
   if (!empresa) return { erro: "Falta o nome da empresa." };
   const todos = await leadsAgentes();
@@ -170,10 +172,12 @@ async function entregarAoSdr(a: any) {
     nicho: curto(a.nicho || base.categoria, 80), cidade: curto(a.cidade || base.cidade || "Montes Claros", 60), bairro: curto(a.bairro, 60),
     telefone: curto(a.telefone || base.telefone || base.telefoneIntl, 30), instagram: ig ? "@" + ig : "", site: curto(a.site || base.site, 200),
     google: curto(a.google, 60), falhas: curto(a.falhas, 600), gancho: curto(a.gancho, 400),
-    fonte: `Josué, pelo escritório virtual (${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })})`,
+    fonte: `${NOME[quem]}, pelo escritório virtual (${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })})`,
     leadGeradoId: a.lead_id || null, criadoEm: agora, etapaDesde: agora,
-    historico: [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }],
-    atividades: [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Calebe"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }],
+    historico: quem === "josue" ? [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }] : [{ dono: sdr, etapa: "novo", em: agora }],
+    atividades: quem === "josue"
+      ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Calebe"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
+      : [{ texto: `${NOME[quem]} encontrou, analisou e deu nota ${a.nota ?? "–"}/10`, em: agora }],
   };
   await salvarAg(l);
   return { ok: true, lead: resumoLead(l) };
@@ -198,7 +202,7 @@ async function moverLead(agente: string, a: any) {
   if (etapa === "descartado" && !a.motivo) return { erro: "Para descartar, diga o motivo." };
   const agora = Date.now(), de = `${NOME[l.dono]} · ${NOME_ETAPA[l.etapa] || l.etapa}`;
   const dono = etapa === "descartado" ? "descartado" : l.dono;
-  if (etapa === "descartado") l.motivo = curto(a.motivo, 120);
+  if (etapa === "descartado") { l.motivo = curto(a.motivo, 120); l.descartadoPor = agente; }
   l.dono = dono; l.etapa = etapa; l.etapaDesde = agora;
   (l.historico = l.historico || []).push({ dono, etapa, em: agora });
   (l.atividades = l.atividades || []).unshift({ texto: curto(a.observacao, 300) || `${de} → ${NOME[dono] || dono} · ${NOME_ETAPA[etapa] || etapa}`, em: agora });
@@ -262,6 +266,7 @@ Deno.serve(async (req) => {
     else if (f === "analisar_site") r = await analisarSiteF(a);
     else if (f === "consultar_cnpj") r = await cnpjF(a);
     else if (f === "entregar_ao_sdr") r = await entregarAoSdr(a);
+    else if (f === "adicionar_ao_funil") r = await entregarAoSdr(a, agente);
     else if (f === "ver_funil") r = await verFunil(agente, a);
     else if (f === "mover_lead") r = await moverLead(agente, a);
     else if (f === "anotar_no_lead") r = await anotar(agente, a);
