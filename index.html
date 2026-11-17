@@ -848,14 +848,26 @@ function vozDe(id){const g=(VOZ[id]||{}).g||'m';if(!VOZES.length)carregaVozes();
   // dois agentes do mesmo gênero: se houver mais de uma voz, cada um fica com uma diferente
   const par=g==='m'?['josue','calebe']:['camila','fernanda'];const i=Math.max(0,par.indexOf(id));
   if(da.length)return da[i%da.length];return VOZES[0]||null}
-function frases(t){return String(t).replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ').replace(/\s+/g,' ').match(/[^.!?…]+[.!?…]*\s*/g)||[t]}
-function falar(id,texto,depois){const gen=V.gen;try{speechSynthesis.cancel()}catch(e){}
-  const v=vozDe(id),cfg=VOZ[id]||{},A=ACT[id];const partes=frases(texto).map(x=>x.trim()).filter(Boolean);
-  if(!partes.length||!window.speechSynthesis){depois&&depois();return}
-  V.utts=[];V.mode='speaking';V.falando=true;if(A)showBubble(A,texto,Math.min(25000,3000+texto.length*65));
+function frases(t){return String(t).replace(/\s+/g,' ').match(/[^.!?…]+[.!?…]*\s*/g)||[t]}
+function limpaFala(t){return String(t).replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ').replace(/\s+/g,' ').trim()}
+/* voz neural da Microsoft (função "voz" no Supabase); se não estiver configurada, usa a voz do navegador */
+const FN_VOZ='https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/voz';let AUD=null;
+function pararAudio(){if(AUD){try{AUD.pause()}catch(e){}AUD=null}try{speechSynthesis.cancel()}catch(e){}}
+function falarNavegador(id,texto,fim){const v=vozDe(id),cfg=VOZ[id]||{};const partes=frases(texto).map(x=>x.trim()).filter(Boolean);
+  if(!partes.length||!window.speechSynthesis){fim();return}V.utts=[];
   partes.forEach((f,k)=>{const u=new SpeechSynthesisUtterance(f);u.lang='pt-BR';if(v)u.voice=v;u.pitch=cfg.pitch||1;u.rate=cfg.rate||1.05;
-    if(k===partes.length-1){const fim=()=>{if(gen!==V.gen)return;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+700;V.userAt=Date.now();depois&&depois()};u.onend=fim;u.onerror=fim}
-    V.utts.push(u);speechSynthesis.speak(u)})}
+    if(k===partes.length-1){u.onend=fim;u.onerror=fim}V.utts.push(u);speechSynthesis.speak(u)})}
+function falar(id,texto,depois){const gen=V.gen;pararAudio();texto=limpaFala(texto);if(!texto){depois&&depois();return}
+  const A=ACT[id];V.mode='speaking';V.falando=true;if(A)showBubble(A,texto,Math.min(25000,3000+texto.length*65));
+  let feito=false;const fim=()=>{if(feito||gen!==V.gen)return;feito=true;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+700;V.userAt=Date.now();depois&&depois()};
+  const plano=()=>{if(gen===V.gen&&!feito)falarNavegador(id,texto,fim)};
+  if(V.semAzure){plano();return}
+  fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto})})
+    .then(async r=>{if(gen!==V.gen)return;if(!r.ok){if(r.status===503)V.semAzure=true;plano();return}
+      const b=await r.blob();if(gen!==V.gen)return;const url=URL.createObjectURL(b);const au=new Audio(url);AUD=au;
+      au.onended=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;fim()};au.onerror=()=>{if(AUD===au)AUD=null;plano()};
+      au.play().catch(()=>{if(AUD===au)AUD=null;plano()})})
+    .catch(()=>plano())}
 function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a)return;
   if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening'}
@@ -882,7 +894,7 @@ async function pensar(){const id=V.agent,ss=V.sess;if(!id||!ss)return;const gen=
     ss.msgs.push({role:'assistant',content:j.texto});memAdd(id,'a',j.texto);falar(id,j.texto)}
   catch(e){if(e.name==='AbortError')return;if(gen===V.gen){V.pensando=false;setSay('Sem conexão com '+first(a.nome)+'. Confira a internet.');setTimeout(()=>setSay(''),5000)}}}
 function endVoice(semOuvir){V.gen++;const id=V.agent;V.agent=null;V.sess=null;V.mode=null;V.falando=false;V.pensando=false;
-  if(V.ctl){try{V.ctl.abort()}catch(e){}V.ctl=null}try{speechSynthesis.cancel()}catch(e){}
+  if(V.ctl){try{V.ctl.abort()}catch(e){}V.ctl=null}pararAudio();
   if(id){const A=ACT[id];if(A&&A.bubble){A.p.root.remove(A.bubble);A.bubble=null}}
   setSay('');if(!semOuvir)startNameListening()}
 /* a cada passo: saiu da sala, a conversa acaba na hora */
