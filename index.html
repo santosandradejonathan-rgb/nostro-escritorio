@@ -799,7 +799,7 @@ function showBubble(actor,text,ms,mine){if(actor.bubble){actor.p.root.remove(act
   if(ms)actor.bubbleT=setTimeout(()=>{if(actor.bubble===b){actor.p.root.remove(b);actor.bubble=null}},ms)}
 function setSay(t){$('say').textContent=t||''}
 function nameIn(text){const n=norm(text);for(const a of S.agents){const f=norm(first(a.nome));if(f&&new RegExp('(^|[^a-z])'+f+'([^a-z]|$)').test(n))return a.id}return null}
-const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,userAt:0,gen:0};
+const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,userAt:0,gen:0,closing:0};
 /* memória de cada agente: o que já foi conversado fica guardado neste navegador */
 function memKey(id){return 'nostro.mem.'+id+'.'+norm(M.nome||'jonathan')}
 function memGet(id){try{return JSON.parse(localStorage.getItem(memKey(id))||'[]')}catch(e){return[]}}
@@ -808,6 +808,10 @@ function memAdd(id,who,text){text=String(text||'').trim();if(!text)return;const 
 function memText(id){const a=agentById(id);const m=memGet(id).slice(-24);if(!m.length)return 'Nenhuma conversa anterior. É a primeira vez que vocês conversam.';
   const now=new Date();const fmt=ts=>{const d=new Date(ts);const dias=Math.floor((new Date(now.toDateString())-new Date(d.toDateString()))/864e5);const h=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});return dias===0?'hoje '+h:dias===1?'ontem '+h:d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+h};
   return m.map(x=>`[${fmt(x.ts)}] ${x.w==='u'?first(M.nome||'Jonathan'):first(a.nome)}: ${x.t}`).join('\n')}
+/* despedida: quando você encerra, a conversa fecha na hora */
+function isFarewell(text){const n=norm(text).replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();if(!n)return false;
+  if(/(^| )(tchau|xau|ate mais|ate logo|ate depois|ate amanha|ate ja|falou|fui|vou nessa|to indo|pode ir|e so isso|era so isso|so isso mesmo|encerra|encerrar|depois a gente (fala|conversa|ve)|boa noite pra voce|bom descanso)( |$)/.test(n))return true;
+  const w=n.split(' ').length;return w<=4&&/(^| )(valeu|obrigado|obrigada|brigado|beleza entao|ta bom entao|show)( |$)/.test(n)}
 /* onde cada um está */
 const roomId=(x,z)=>{const r=roomAt(x,z);return r?r.id:null};
 function agentRoom(id){const A=ACT[id];return A?roomId(A.x,A.z):null}
@@ -820,7 +824,7 @@ function agentComes(id,cb){const A=ACT[id];if(!A)return;
 function sendHome(id){const A=ACT[id];if(!A)return;A.coming=false;A.speed=1.35;A.came=false;if(A.home&&A.seat!==A.home)A.sitOn(A.home)}
 /* você falou algo sem conversa aberta */
 function onHeard(text){
-  if(!V.entered||V.starting)return;const h=humanIn(text);if(h){callHuman(h);return}
+  if(!V.entered||V.starting)return;if(isFarewell(text)&&!nameIn(text))return;const h=humanIn(text);if(h){callHuman(h);return}
   const named=nameIn(text);
   if(named){const a=agentById(named);
     if(agentRoom(named)===S.room)startVoice(named,text);
@@ -834,7 +838,7 @@ function onHeard(text){
 async function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a||!a.eleven)return;
   if(V.agent===id&&V.conv){if(firstText){try{V.conv.sendUserMessage(firstText)}catch(e){}}return}
-  const gen=++V.gen;V.starting=true;stopNameListening();let answered=false;
+  const gen=++V.gen;V.starting=true;V.closing=0;stopNameListening();let answered=false;
   if(V.conv){const old=V.conv;V.conv=null;try{old.setVolume({volume:0})}catch(e){}try{await old.endSession()}catch(e){}}
   V.agent=id;V.last=id;V.lastAt=Date.now();V.userAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';const historico=memText(id);
@@ -847,10 +851,10 @@ async function startVoice(id,firstText){
         const send=()=>{if(gen!==V.gen||answered)return;try{(V.conv||conv).sendUserMessage(firstText)}catch(e){}};
         setTimeout(send,1200);setTimeout(send,6000)}},
       onDisconnect:()=>{if(gen===V.gen&&V.agent===id){V.conv=null;V.agent=null;V.mode=null;setTimeout(startNameListening,400)}},
-      onModeChange:({mode})=>{if(gen===V.gen)V.mode=mode},
+      onModeChange:({mode})=>{if(gen!==V.gen)return;const was=V.mode;V.mode=mode;if(V.closing&&was==='speaking'&&mode==='listening')setTimeout(()=>{if(gen===V.gen)endVoice()},250)},
       onMessage:m=>{if(gen!==V.gen)return;S.talkAt=Date.now();V.lastAt=Date.now();const A=ACT[id];
         if(m.source==='ai'){answered=true;const txt=String(m.message||'').replace(/\[[^\]]{1,24}\]\s*/g,'').trim();if(!txt)return;memAdd(id,'a',txt);if(A)showBubble(A,txt,Math.min(20000,3000+txt.length*60))}
-        else{const um=String(m.message||'').trim();if(!um||/^\.+$/.test(um))return;V.userAt=Date.now();if(firstText&&norm(um)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
+        else{const um=String(m.message||'').trim();if(!um||/^\.+$/.test(um))return;V.userAt=Date.now();if(isFarewell(um)){V.closing=Date.now();setTimeout(()=>{if(gen===V.gen&&V.closing&&V.mode!=='speaking')endVoice()},2500);setTimeout(()=>{if(gen===V.gen&&V.closing)endVoice()},9000)}else V.closing=0;if(firstText&&norm(um)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
           const hu=humanIn(m.message);if(hu)callHuman(hu);
           const other=nameIn(m.message);if(other&&other!==id){
             if(agentRoom(other)===S.room)startVoice(other,m.message);
