@@ -176,7 +176,7 @@ button{cursor:pointer}
       <div class="viewbar"><label for="roomView">Ver sala<select id="roomView"><option value="">Seguindo você</option></select></label><button class="back" type="button" id="backToMe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Voltar para mim</button></div>
       <div class="talk" id="talk"><div class="say" id="say" aria-live="polite"></div></div>
       <div class="selfwrap" id="selfwrap"><video id="selfview" muted playsinline autoplay></video><span>Você</span></div>
-      <div class="hud"><div class="k">Fale o nome de quem você quer chamar, ou chegue perto. Ande com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou clicando; dois dedos movem a visão.</div></div>
+      <div class="hud"><div class="k">Entre numa sala e fale normalmente. Para chamar alguém de outra sala, diga o nome. Ande com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou clicando; dois dedos movem a visão.</div></div>
       <div class="edittools" id="edittools" role="toolbar" aria-label="Arrumar móveis"><span id="editHint">Clique numa cadeira ou notebook</span>
         <button type="button" id="rotL" disabled>↺ Girar</button><button type="button" id="rotR" disabled>Girar ↻</button><button type="button" id="rot180" disabled>Virar</button><button type="button" id="resetObj" disabled>Original</button><button type="button" class="done" id="editDone">Concluir</button></div>
       <div class="ctrl">
@@ -667,7 +667,7 @@ function renderAgents(){
     const home=reg('chair',ch,'chair-agent-'+a.id);
     const c=[x-1.2,z-.52,x+1.2,z+.52];c.agent=true;COLS.push(c);
     let A=ACT[a.id];
-    if(!A){const P=new Person(lookOf(a,i));P.root.traverse(o=>{if(o.isMesh)o.userData.agent=a.id});A=new Actor(P,1.35);ACT[a.id]=A;A.ai={t:15+Math.random()*50,out:false}}
+    if(!A){const P=new Person(lookOf(a,i));P.root.traverse(o=>{if(o.isMesh)o.userData.agent=a.id});A=new Actor(P,1.35);ACT[a.id]=A;A.ai={t:90+Math.random()*150,out:false}}
     const oldHome=A.home;A.home=home;
     if(!A.placed){A.placed=true;A.sitNow(home)}else if(A.seat&&oldHome&&A.seat===oldHome){oldHome.occ=null;A.seat=home;home.occ=A}
     if(A.badge)A.p.root.remove(A.badge);if(A.tag)A.p.root.remove(A.tag);if(!A.ring){A.ring=new THREE.Mesh(new THREE.RingGeometry(.85,.97,48),new THREE.MeshBasicMaterial({color:0xc9a45c,transparent:true,opacity:0,depthWrite:false}));A.ring.rotation.x=-Math.PI/2;A.ring.position.y=.02;A.p.root.add(A.ring)}
@@ -688,17 +688,18 @@ function refreshAgentStates(){
 const agentById=id=>S.agents.find(a=>a.id===id);
 function agentAI(a,dt){
   const A=ACT[a.id];if(!A||!ME)return;
-  const talking=(S.talkTo===a.id&&Date.now()-S.talkAt<60000)||S.near===a.id;
+  const talking=V.agent===a.id||(S.talkTo===a.id&&Date.now()-S.talkAt<15000)||A.coming;
+  if(A.came&&!talking&&!A.coming){sendHome(a.id);return}
   A.p.typing=A.state==='sitting'&&(A.seat===A.home||S.busy===a.id)&&!talking;
   if(S.busy===a.id&&A.state==='sitting')A.p.typing=true;
-  if(talking){if(A.state==='walk'&&!A.coming)A.stop();if(A.state==='stand')A.yaw=angLerp(A.yaw,Math.atan2(ME.x-A.x,ME.z-A.z),Math.min(1,dt*4));return}
+  if(talking){if(A.coming)return;if(A.state==='walk')A.stop();if(A.state==='stand')A.yaw=angLerp(A.yaw,Math.atan2(ME.x-A.x,ME.z-A.z),Math.min(1,dt*4));return}
   if(A.state!=='sitting'&&A.state!=='stand')return;
   A.ai.t-=dt;if(A.ai.t>0)return;
-  if(!A.ai.out){A.ai.out=true;A.ai.t=12+Math.random()*16;
+  if(!A.ai.out){A.ai.out=true;A.ai.t=20+Math.random()*25;
     const free=MOV.filter(m=>m.kind==='chair'&&!m.occ&&!/-agent-/.test(m.key)&&(()=>{const s=A.seatInfo(m),r=roomAt(s.x,s.z);return r&&['reuniao','cozinha','jogos','recepcao'].includes(r.id)})());
     if(Math.random()<.5&&free.length)A.sitOn(free[Math.floor(Math.random()*free.length)]);
     else{const p=POIS[Math.floor(Math.random()*POIS.length)];A.goTo(p[0],p[1],()=>{A.yaw=p[2]})}}
-  else{A.ai.out=false;A.ai.t=35+Math.random()*60;if(A.home)A.sitOn(A.home)}
+  else{A.ai.out=false;A.ai.t=150+Math.random()*240;if(A.home)A.sitOn(A.home)}
 }
 
 
@@ -750,7 +751,7 @@ function loop(now){
   ME.update(dt,t);S.me.x=ME.x;S.me.z=ME.z;
   meTag.position.y=lerp(2.05,1.6,ME.p.sit);meBadge.position.y=lerp(2.45,2.0,ME.p.sit);updatePeers(dt,t);sendPos(false);
   for(const a of S.agents){agentAI(a,dt);const A=ACT[a.id];if(!A)continue;A.update(dt,t);a._x=A.x;a._z=A.z;
-    A.tag.position.y=lerp(2.05,1.6,A.p.sit);A.badge.position.y=lerp(2.45,2.0,A.p.sit);const m=A.ring.material;m.opacity+=((S.near===a.id?.75:0)-m.opacity)*Math.min(1,dt*6)}
+    A.tag.position.y=lerp(2.05,1.6,A.p.sit);A.badge.position.y=lerp(2.45,2.0,A.p.sit);const m=A.ring.material;const on=V.agent===a.id?(V.mode==='speaking'?.55+.35*Math.sin(t*9):.75):0;m.opacity+=(on-m.opacity)*Math.min(1,dt*8)}
   // portas abrem para qualquer pessoa por perto
   const ppl=[ME,...Object.values(ACT),...Object.values(M.peers).filter(p=>p.seen)];
   for(const d of doorObjs){let near=false;for(const q of ppl)if(Math.hypot(d.cx-q.x,d.z-q.z)<2.1){near=true;break}const target=near?1.45*d.dir:0;d.a+=(target-d.a)*Math.min(1,dt*7);d.pivot.rotation.y=d.a}
@@ -765,11 +766,11 @@ function move(dx,dz){const nx=ME.x+dx,nz=ME.z+dz;if(!hits(nx,nz)){ME.x=nx;ME.z=n
 const roomAt=(x,z)=>ROOMS.find(r=>x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1);
 function checkSurroundings(){
   const r=roomAt(S.me.x,S.me.z);const rid=r?r.id:null;
-  if(rid&&rid!==S.room){const prev=S.room;S.room=rid;$('here').innerHTML=`<span>Você está em</span><strong>${esc(r.nome)}</strong>`;
+  if(rid&&rid!==S.room){const prev=S.room;S.room=rid;onRoomChange(prev,rid);$('here').innerHTML=`<span>Você está em</span><strong>${esc(r.nome)}</strong>`;
     if(prev){if(rid==='recepcao'&&prev==='entrada')bell('entrada');else if(r.door&&prev==='corredor')bell('sala')}}
   let best=null,bd=1e9;for(const a of S.agents){if(a._x==null)continue;const d=Math.hypot(a._x-S.me.x,a._z-S.me.z);if(d<2.6&&d<bd){bd=d;best=a.id}}
-  if(best!==S.near){S.near=best;if(best&&V.agent!==best)startVoice(best,false);if(!best){S.dismissed=S.dismissed==='leads'?'leads':null;if(S.panel&&S.panel.type==='agent'&&!S.panel.pinned)closePanel()}}
-  if(V.agent&&!V.starting){const A=ACT[V.agent];if(A&&!A.coming&&Math.hypot(A.x-ME.x,A.z-ME.z)>8&&Date.now()-S.talkAt>4000)endVoice()}
+  if(best!==S.near){S.near=best;if(!best){S.dismissed=S.dismissed==='leads'?'leads':null;if(S.panel&&S.panel.type==='agent'&&!S.panel.pinned)closePanel()}}
+  voiceGuard();
   const atDesk=Math.hypot(17.5-S.me.x,4.3-S.me.z)<1.6||(ME.seat&&ME.seat.key==='chair-1');
   if(atDesk&&!S.near&&!S.edit&&(!S.panel||S.panel.type!=='leads')&&S.dismissed!=='leads')openLeadsPanel();
   if(!atDesk){if(S.panel&&S.panel.type==='leads'&&!S.panel.pinned)closePanel();if(S.dismissed==='leads')S.dismissed=null}
@@ -798,31 +799,81 @@ function showBubble(actor,text,ms,mine){if(actor.bubble){actor.p.root.remove(act
   if(ms)actor.bubbleT=setTimeout(()=>{if(actor.bubble===b){actor.p.root.remove(b);actor.bubble=null}},ms)}
 function setSay(t){$('say').textContent=t||''}
 function nameIn(text){const n=norm(text);for(const a of S.agents){const f=norm(first(a.nome));if(f&&new RegExp('(^|[^a-z])'+f+'([^a-z]|$)').test(n))return a.id}return null}
-const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false};
-function agentComes(id){const A=ACT[id];if(!A)return;if(Math.hypot(A.x-ME.x,A.z-ME.z)>4.5){A.coming=true;const dx=ME.x-A.x,dz=ME.z-A.z,d=Math.hypot(dx,dz);A.goTo(ME.x-dx/d*1.3,ME.z-dz/d*1.3,()=>{A.coming=false})}else if(A.state==='walk')A.stop()}
-async function startVoice(id,call){
-  if(!V.entered||V.starting)return;if(V.agent===id&&V.conv)return;const a=agentById(id);if(!a||!a.eleven)return;
-  V.starting=true;stopNameListening();
-  if(V.conv){const old=V.conv;V.conv=null;try{await old.endSession()}catch(e){}}
-  V.agent=id;S.talkTo=id;S.talkAt=Date.now();if(call)agentComes(id);setSay('Chamando '+first(a.nome)+'…');
+const V={conv:null,agent:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,gen:0};
+/* memória de cada agente: o que já foi conversado fica guardado neste navegador */
+function memKey(id){return 'nostro.mem.'+id+'.'+norm(M.nome||'jonathan')}
+function memGet(id){try{return JSON.parse(localStorage.getItem(memKey(id))||'[]')}catch(e){return[]}}
+function memAdd(id,who,text){text=String(text||'').trim();if(!text)return;const m=memGet(id);const prev=m[m.length-1];
+  if(prev&&prev.w===who&&Date.now()-prev.ts<4000&&prev.t===text)return;m.push({w:who,t:text.slice(0,400),ts:Date.now()});while(m.length>40)m.shift();try{localStorage.setItem(memKey(id),JSON.stringify(m))}catch(e){}}
+function memText(id){const a=agentById(id);const m=memGet(id).slice(-24);if(!m.length)return 'Nenhuma conversa anterior. É a primeira vez que vocês conversam.';
+  const now=new Date();const fmt=ts=>{const d=new Date(ts);const dias=Math.floor((new Date(now.toDateString())-new Date(d.toDateString()))/864e5);const h=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});return dias===0?'hoje '+h:dias===1?'ontem '+h:d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+h};
+  return m.map(x=>`[${fmt(x.ts)}] ${x.w==='u'?first(M.nome||'Jonathan'):first(a.nome)}: ${x.t}`).join('\n')}
+/* onde cada um está */
+const roomId=(x,z)=>{const r=roomAt(x,z);return r?r.id:null};
+function agentRoom(id){const A=ACT[id];return A?roomId(A.x,A.z):null}
+function agentsHere(){if(!S.room)return[];return S.agents.filter(a=>agentRoom(a.id)===S.room)}
+function peopleTalkingHere(){return Object.values(M.peers).some(p=>p.seen&&p.vol>.5)}
+/* chamar pelo nome: só quem foi chamado vem até você */
+function agentComes(id,cb){const A=ACT[id];if(!A)return;
+  const dx=ME.x-A.x,dz=ME.z-A.z,d=Math.hypot(dx,dz)||1;A.coming=true;A.calledBy=S.room;A.speed=1.9;
+  A.goTo(ME.x-dx/d*1.3,ME.z-dz/d*1.3,()=>{A.coming=false;A.speed=1.35;A.came=true;A.yaw=Math.atan2(ME.x-A.x,ME.z-A.z);if(roomId(A.x,A.z)===S.room)cb&&cb()})}
+function sendHome(id){const A=ACT[id];if(!A)return;A.coming=false;A.speed=1.35;A.came=false;if(A.home&&A.seat!==A.home)A.sitOn(A.home)}
+/* você falou algo sem conversa aberta */
+function onHeard(text){
+  if(!V.entered||V.starting)return;const h=humanIn(text);if(h){callHuman(h);return}
+  const named=nameIn(text);
+  if(named){const a=agentById(named);
+    if(agentRoom(named)===S.room)startVoice(named,text);
+    else{setSay(first(a.nome)+' está vindo…');agentComes(named,()=>startVoice(named,text))}
+    return}
+  if(peopleTalkingHere())return; // com gente conversando na sala, só responde quem for chamado pelo nome
+  const here=agentsHere();if(!here.length)return;
+  let id=V.last&&here.some(a=>a.id===V.last)&&Date.now()-V.lastAt<10*60000?V.last:null;
+  if(!id){let bd=1e9;for(const a of here){const A=ACT[a.id];const d=Math.hypot(A.x-ME.x,A.z-ME.z);if(d<bd){bd=d;id=a.id}}}
+  startVoice(id,text)}
+async function startVoice(id,firstText){
+  if(!V.entered)return;const a=agentById(id);if(!a||!a.eleven)return;
+  if(V.agent===id&&V.conv){if(firstText){try{V.conv.sendUserMessage(firstText)}catch(e){}}return}
+  const gen=++V.gen;V.starting=true;stopNameListening();
+  if(V.conv){const old=V.conv;V.conv=null;try{old.setVolume({volume:0})}catch(e){}try{await old.endSession()}catch(e){}}
+  V.agent=id;V.last=id;V.lastAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
+  const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';const historico=memText(id);
+  if(firstText){showBubble(ME,firstText,4000,true);memAdd(id,'u',firstText)}
   try{
     const conv=await Conversation.startSession({agentId:a.eleven,connectionType:'webrtc',
-      onConnect:()=>{if(V.agent===id)setSay('Conversando com '+first(a.nome)+' · fale normalmente')},
-      onDisconnect:()=>{if(V.conv===conv||V.agent===id){V.conv=null;V.agent=null;V.mode=null;setSay('');setTimeout(startNameListening,400)}},
-      onModeChange:({mode})=>{if(V.agent===id)V.mode=mode},
-      onMessage:m=>{S.talkAt=Date.now();const A=ACT[id];
-        if(m.source==='ai'){if(A)showBubble(A,m.message,Math.min(20000,3000+m.message.length*60))}
-        else{showBubble(ME,m.message,4000,true);const hu=humanIn(m.message);if(hu)callHuman(hu);const other=nameIn(m.message);if(other&&other!==id)startVoice(other,true)}},
+      dynamicVariables:{interlocutor:M.nome||'Jonathan',sala,historico},
+      onConnect:()=>{if(gen!==V.gen)return;setSay('');if(firstText){try{conv.sendUserMessage(firstText)}catch(e){}}},
+      onDisconnect:()=>{if(gen===V.gen&&V.agent===id){V.conv=null;V.agent=null;V.mode=null;setTimeout(startNameListening,400)}},
+      onModeChange:({mode})=>{if(gen===V.gen)V.mode=mode},
+      onMessage:m=>{if(gen!==V.gen)return;S.talkAt=Date.now();V.lastAt=Date.now();const A=ACT[id];
+        if(m.source==='ai'){memAdd(id,'a',m.message);if(A)showBubble(A,m.message,Math.min(20000,3000+m.message.length*60))}
+        else{if(firstText&&norm(m.message)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
+          const hu=humanIn(m.message);if(hu)callHuman(hu);
+          const other=nameIn(m.message);if(other&&other!==id){
+            if(agentRoom(other)===S.room)startVoice(other,m.message);
+            else{const o=agentById(other);endVoice();setSay(first(o.nome)+' está vindo…');agentComes(other,()=>startVoice(other,m.message))}}}},
       onError:e=>{console.warn('voz',e)}});
-    if(V.agent===id)V.conv=conv;else{try{await conv.endSession()}catch(e){}}
-  }catch(e){console.warn(e);setSay('Não consegui conectar com '+first(a.nome)+'. Confira o microfone e a internet.');V.agent=null;setTimeout(startNameListening,800)}
-  V.starting=false;
+    if(gen===V.gen)V.conv=conv;else{try{conv.setVolume({volume:0})}catch(e){}try{await conv.endSession()}catch(e){}}
+  }catch(e){console.warn(e);if(gen===V.gen){setSay('Não consegui conectar com '+first(a.nome)+'. Confira o microfone e a internet.');setTimeout(()=>setSay(''),5000);V.agent=null;setTimeout(startNameListening,800)}}
+  if(gen===V.gen)V.starting=false;
 }
-async function endVoice(){const c=V.conv;V.conv=null;V.agent=null;V.mode=null;if(c){try{await c.endSession()}catch(e){}}setSay('');startNameListening()}
-/* ouvir nomes enquanto ninguém está conversando */
+async function endVoice(){V.gen++;const c=V.conv;const id=V.agent;V.conv=null;V.agent=null;V.mode=null;V.starting=false;
+  if(c){try{c.setVolume({volume:0})}catch(e){}try{await c.endSession()}catch(e){}}
+  if(id){const A=ACT[id];if(A&&A.bubble){A.p.root.remove(A.bubble);A.bubble=null}}
+  setSay('');startNameListening()}
+/* a cada passo: saiu da sala, a conversa acaba na hora */
+function voiceGuard(){
+  if(!V.agent)return;const A=ACT[V.agent];
+  if(A&&!A.coming&&agentRoom(V.agent)!==S.room){endVoice();return}
+  // conversa parada por um tempo fecha sozinha (economiza os minutos da ElevenLabs); é só falar de novo
+  if(V.conv&&V.mode!=='speaking'&&Date.now()-V.lastAt>30000)endVoice()}
+function onRoomChange(prev,now){
+  if(V.agent&&agentRoom(V.agent)!==now)endVoice();
+  for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
+/* ouvir enquanto ninguém está conversando */
 function startNameListening(){V.recWanted=true;if(V.conv||V.starting||!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
-  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;
-  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const t=ev.results[i][0].transcript;const h=humanIn(t);if(h&&ev.results[i].isFinal){callHuman(h);continue}const id=nameIn(t);if(id){stopNameListening();startVoice(id,true);return}}};
+  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=false;V.rec=r;
+  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){if(!ev.results[i].isFinal)continue;const t=ev.results[i][0].transcript.trim();if(t.length<2)continue;onHeard(t);if(V.starting||V.conv)return}};
   r.onend=()=>{V.rec=null;if(V.recWanted&&!V.conv&&!V.starting)setTimeout(startNameListening,300)};
   r.onerror=e=>{if(e.error==='not-allowed'){V.recWanted=false;setSay('Permita o microfone para conversar com o time.')}};
   try{r.start()}catch(e){V.rec=null}}
@@ -1027,7 +1078,7 @@ function updatePeers(dt,t){
     P.root.position.set(p.x,0,p.z);P.root.rotation.y=p.yaw;P.pose(t);p.tag.position.y=lerp(2.05,1.6,P.sit);p.badge.position.y=lerp(2.45,2.0,P.sit);
     // mesma sala, bem perto, ou chamado pelo nome = vocês se ouvem
     const d=Math.hypot(p.x-ME.x,p.z-ME.z);const called=Date.now()-(M.calls[p.id]||0)<120000;
-    const want=(called||(p.room&&p.room===S.room&&p.room!=='corredor')||d<3.2)?1:0;p.vol+=(want-p.vol)*Math.min(1,dt*4);p.audio.volume=Math.max(0,Math.min(1,p.vol))}}
+    const want=(called||(p.room&&p.room===S.room&&(p.room!=='corredor'||d<6)))?1:0;p.vol+=(want-p.vol)*Math.min(1,dt*4);p.audio.volume=Math.max(0,Math.min(1,p.vol))}}
 function renderPeople(){const n=Object.keys(M.peers).length;const el=$('people');if(!el)return;
   const ag=S.agents.slice(0,6).map(a=>`<div class="av">${faceHTML(a)}</div>`).join('');
   const hu=Object.values(M.peers).slice(0,6).map(p=>`<div class="av mono" title="${esc(p.nome)}">${esc((first(p.nome)[0]||'?').toUpperCase())}</div>`).join('');
