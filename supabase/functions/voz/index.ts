@@ -10,7 +10,7 @@ const ORIGENS = [
 // voz de cada agente (dá para trocar sem mexer no código com o segredo VOZES_AGENTES em JSON)
 const PADRAO: Record<string, { voz: string; ritmo: string; tom: string }> = {
   josue: { voz: "pt-BR-AntonioNeural", ritmo: "+14%", tom: "-2%" },
-  calebe: { voz: "pt-BR-DonatoNeural", ritmo: "+16%", tom: "+0%" },
+  calebe: { voz: "pt-BR-MacerioMultilingualNeural", ritmo: "+12%", tom: "+0%" },
   camila: { voz: "pt-BR-ThalitaNeural", ritmo: "+15%", tom: "+0%" },
   fernanda: { voz: "pt-BR-FranciscaNeural", ritmo: "+12%", tom: "+0%" },
 };
@@ -44,15 +44,18 @@ Deno.serve(async (req) => {
   let mapa = PADRAO;
   try { const extra = JSON.parse(Deno.env.get("VOZES_AGENTES") || "{}"); mapa = { ...PADRAO, ...extra }; } catch { /* usa o padrão */ }
   const cfg = mapa[String(corpo.agente || "")] || PADRAO.josue;
-  // permite testar outra voz (só vozes neurais em português do Brasil)
-  const voz = /^pt-BR-[A-Za-z]+Neural$/.test(String(corpo.voz || "")) ? String(corpo.voz) : cfg.voz;
+  // voz escolhida na página de vozes (neurais, multilíngues ou HD da Microsoft)
+  const voz = /^[a-z]{2}-[A-Z]{2}-[A-Za-z]+(:[A-Za-z0-9]+)?Neural$/.test(String(corpo.voz || "")) ? String(corpo.voz) : cfg.voz;
   const texto = String(corpo.texto || "").replace(/\s+/g, " ").trim().slice(0, 1500);
   if (!texto) return json({ erro: "sem texto" }, 400);
 
-  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="pt-BR"><voice name="${voz}"><prosody rate="${cfg.ritmo}" pitch="${cfg.tom}">${xml(texto)}</prosody></voice></speak>`;
-  let r: Response;
-  try {
-    r = await fetch(`https://${regiao}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+  const ritmo = String(corpo.ritmo || cfg.ritmo), tom = String(corpo.tom || cfg.tom);
+  const sintetiza = (nome: string) => {
+    // vozes multilíngues/HD: força o português do Brasil
+    const multi = !nome.startsWith("pt-BR-") || /Multilingual|:/.test(nome);
+    const fala = multi ? `<lang xml:lang="pt-BR">${xml(texto)}</lang>` : xml(texto);
+    const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" xml:lang="pt-BR"><voice name="${nome}"><prosody rate="${/^[+-]\d{1,2}%$/.test(ritmo) ? ritmo : "+10%"}" pitch="${/^[+-]\d{1,2}%$/.test(tom) ? tom : "+0%"}">${fala}</prosody></voice></speak>`;
+    return fetch(`https://${regiao}.tts.speech.microsoft.com/cognitiveservices/v1`, {
       method: "POST",
       headers: {
         "Ocp-Apim-Subscription-Key": chave,
@@ -62,6 +65,12 @@ Deno.serve(async (req) => {
       },
       body: ssml,
     });
+  };
+  let r: Response;
+  try {
+    r = await sintetiza(voz);
+    // se a voz escolhida não existir nesta região, cai na voz padrão do agente (menos no teste da página de vozes)
+    if (!r.ok && voz !== cfg.voz && !corpo.teste) r = await sintetiza(cfg.voz);
   } catch (_e) {
     return json({ erro: "não consegui falar com o Azure" }, 502);
   }

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vozes do time · Nostro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--fundo:#0f0e0c;--cartao:#181715;--linha:#2a2824;--texto:#ece8df;--suave:#9b968b;--ouro:#c9a45c;--ouro2:#e2c27f;--ok:#7fbf8e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fundo);color:var(--texto);font:15px/1.5 Manrope,system-ui,sans-serif}
+  main{max-width:980px;margin:0 auto;padding:32px 20px 60px}
+  h1{font-size:26px;margin:0 0 4px;font-weight:700}
+  .sub{color:var(--suave);margin:0 0 26px}
+  .agentes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:30px}
+  .ag{background:var(--cartao);border:1px solid var(--linha);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:border-color .15s}
+  .ag.ativo{border-color:var(--ouro);box-shadow:0 0 0 1px var(--ouro) inset}
+  .ag img{width:46px;height:46px;border-radius:50%;object-fit:cover;background:#222}
+  .ag b{display:block;font-size:15px}
+  .ag small{color:var(--suave);font-size:12px;display:block;line-height:1.3}
+  .ag .vz{color:var(--ouro2);font-size:12px;margin-top:2px}
+  .barra{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+  .barra h2{font-size:17px;margin:0}
+  .filtros button{background:transparent;border:1px solid var(--linha);color:var(--suave);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+  .filtros button.on{border-color:var(--ouro);color:var(--ouro2)}
+  .lista{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+  .voz{background:var(--cartao);border:1px solid var(--linha);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+  .voz.escolhida{border-color:var(--ok)}
+  .play{width:40px;height:40px;border-radius:50%;border:none;background:var(--ouro);color:#17130b;font-size:16px;cursor:pointer;flex:none}
+  .play.tocando{background:var(--ouro2)}
+  .info{flex:1;min-width:0}
+  .info b{display:block}
+  .info small{color:var(--suave);font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:#2b2416;color:var(--ouro2);margin-left:6px;vertical-align:middle}
+  .usar{background:transparent;border:1px solid var(--ouro);color:var(--ouro2);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;flex:none}
+  .usar:disabled{border-color:var(--ok);color:var(--ok);cursor:default}
+  .aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1f2a21;color:#cfe9d6;border:1px solid #3b5b44;padding:10px 16px;border-radius:10px;display:none}
+  .frase{width:100%;background:var(--cartao);border:1px solid var(--linha);color:var(--texto);border-radius:10px;padding:10px 12px;font:inherit;margin:0 0 18px}
+  label.l{display:block;color:var(--suave);font-size:13px;margin-bottom:6px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Vozes do time</h1>
+  <p class="sub">Escolha o agente, ouça as vozes e clique em <b>Usar</b>. A troca vale na hora no escritório.</p>
+
+  <div class="agentes" id="agentes"></div>
+
+  <label class="l" for="frase">Frase de teste (pode mudar)</label>
+  <input class="frase" id="frase">
+
+  <div class="barra">
+    <h2 id="titulo">Vozes</h2>
+    <div class="filtros" id="filtros">
+      <button data-f="todas">Todas</button>
+      <button data-f="m">Masculinas</button>
+      <button data-f="f">Femininas</button>
+      <button data-f="multi">Mais naturais</button>
+    </div>
+  </div>
+  <div class="lista" id="lista"></div>
+</main>
+<div class="aviso" id="aviso"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm';
+const sb = createClient('https://isfyxyoelqmncqxcrvlx.supabase.co', 'sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z');
+const FN_VOZ = 'https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/voz';
+
+const AGENTES = [
+  { id: 'josue', nome: 'Josué Carvalho', cargo: 'Prospector e analista', g: 'm', foto: 'assets/josue.png',
+    frase: 'Opa, Jonathan! Olha, analisei os leads de hoje e a Matriz tá com o Instagram parado desde agosto. Dá pra gente entrar por aí.' },
+  { id: 'calebe', nome: 'Calebe Nogueira', cargo: 'SDR', g: 'm', foto: 'assets/calebe.png',
+    frase: 'Fala, Jonathan! Tô com cinco leads novos no funil. Acho que a Matriz é a melhor pra começar, quer que eu te conte o porquê?' },
+  { id: 'camila', nome: 'Camila Rocha', cargo: 'SDR', g: 'f', foto: 'assets/camila.png',
+    frase: 'Oi, Jonathan! Tudo certo por aqui. A Spazzio respondeu ontem e parece que tem interesse, viu? Quer que eu marque com você?' },
+  { id: 'fernanda', nome: 'Fernanda Ferreira', cargo: 'Gerente comercial', g: 'f', foto: 'assets/fernanda.png',
+    frase: 'Boa tarde, Jonathan. Resumindo o dia: dez leads no funil, nenhum abordado ainda. O gargalo agora é o WhatsApp.' },
+];
+// vozes que funcionam no serviço da Nostro (região Brasil Sul)
+const VOZES = [
+  { v: 'pt-BR-MacerioMultilingualNeural', n: 'Macério', g: 'm', multi: true, d: 'Brasileiro, mais conversado e natural' },
+  { v: 'pt-BR-ThalitaMultilingualNeural', n: 'Thalita (nova)', g: 'f', multi: true, d: 'Brasileira, mais conversada e natural' },
+  { v: 'en-US-AndrewMultilingualNeural', n: 'Andrew', g: 'm', multi: true, d: 'Muito natural; pode ter leve sotaque' },
+  { v: 'en-US-BrianMultilingualNeural', n: 'Brian', g: 'm', multi: true, d: 'Jovem e descontraído; pode ter leve sotaque' },
+  { v: 'en-US-AvaMultilingualNeural', n: 'Ava', g: 'f', multi: true, d: 'Muito natural; pode ter leve sotaque' },
+  { v: 'en-US-EmmaMultilingualNeural', n: 'Emma', g: 'f', multi: true, d: 'Leve e simpática; pode ter leve sotaque' },
+  { v: 'pt-BR-AntonioNeural', n: 'Antonio', g: 'm', d: 'Brasileiro, adulto e firme' },
+  { v: 'pt-BR-DonatoNeural', n: 'Donato', g: 'm', d: 'Brasileiro, adulto' },
+  { v: 'pt-BR-FabioNeural', n: 'Fábio', g: 'm', d: 'Brasileiro, voz média' },
+  { v: 'pt-BR-HumbertoNeural', n: 'Humberto', g: 'm', d: 'Brasileiro, mais grave' },
+  { v: 'pt-BR-JulioNeural', n: 'Júlio', g: 'm', d: 'Brasileiro, jovem' },
+  { v: 'pt-BR-NicolauNeural', n: 'Nicolau', g: 'm', d: 'Brasileiro, maduro' },
+  { v: 'pt-BR-ValerioNeural', n: 'Valério', g: 'm', d: 'Brasileiro, adulto' },
+  { v: 'pt-BR-FranciscaNeural', n: 'Francisca', g: 'f', d: 'Brasileira, segura e clara' },
+  { v: 'pt-BR-ThalitaNeural', n: 'Thalita', g: 'f', d: 'Brasileira, leve' },
+  { v: 'pt-BR-BrendaNeural', n: 'Brenda', g: 'f', d: 'Brasileira, jovem' },
+  { v: 'pt-BR-ElzaNeural', n: 'Elza', g: 'f', d: 'Brasileira, madura' },
+  { v: 'pt-BR-GiovannaNeural', n: 'Giovanna', g: 'f', d: 'Brasileira, jovem' },
+  { v: 'pt-BR-LeilaNeural', n: 'Leila', g: 'f', d: 'Brasileira, adulta' },
+  { v: 'pt-BR-LeticiaNeural', n: 'Letícia', g: 'f', d: 'Brasileira, jovem' },
+  { v: 'pt-BR-ManuelaNeural', n: 'Manuela', g: 'f', d: 'Brasileira, suave' },
+  { v: 'pt-BR-YaraNeural', n: 'Yara', g: 'f', d: 'Brasileira, adulta' },
+];
+const $ = id => document.getElementById(id);
+let escolhas = {}, atual = 'josue', filtro = 'mesmo', audio = null, tocandoV = null;
+
+function nomeVoz(v) { const x = VOZES.find(o => o.v === v); return x ? x.n : v; }
+function aviso(t) { const a = $('aviso'); a.textContent = t; a.style.display = 'block'; clearTimeout(aviso.t); aviso.t = setTimeout(() => a.style.display = 'none', 2600); }
+
+function desenhaAgentes() {
+  $('agentes').innerHTML = AGENTES.map(a => `<div class="ag ${a.id === atual ? 'ativo' : ''}" data-ag="${a.id}">
+    <img src="${a.foto}" alt=""><div><b>${a.nome}</b><small>${a.cargo}</small><div class="vz">Voz: ${nomeVoz(escolhas[a.id] || '')}</div></div></div>`).join('');
+  document.querySelectorAll('.ag').forEach(el => el.onclick = () => { atual = el.dataset.ag; filtro = 'mesmo'; $('frase').value = AGENTES.find(a => a.id === atual).frase; desenha(); });
+}
+function desenhaLista() {
+  const ag = AGENTES.find(a => a.id === atual);
+  $('titulo').textContent = 'Vozes para ' + ag.nome.split(' ')[0];
+  const f = filtro === 'mesmo' ? ag.g : filtro;
+  document.querySelectorAll('#filtros button').forEach(b => b.classList.toggle('on', b.dataset.f === f || (filtro === 'mesmo' && b.dataset.f === ag.g)));
+  const lista = VOZES.filter(o => f === 'todas' ? true : f === 'multi' ? o.multi : o.g === f);
+  $('lista').innerHTML = lista.map(o => {
+    const usada = escolhas[atual] === o.v;
+    const outro = AGENTES.find(a => a.id !== atual && escolhas[a.id] === o.v);
+    return `<div class="voz ${usada ? 'escolhida' : ''}">
+      <button class="play ${tocandoV === o.v ? 'tocando' : ''}" data-v="${o.v}" title="Ouvir">${tocandoV === o.v ? '■' : '▶'}</button>
+      <div class="info"><b>${o.n}${o.multi ? '<span class="tag">mais natural</span>' : ''}</b><small>${o.d}${outro ? ' · usada por ' + outro.nome.split(' ')[0] : ''}</small></div>
+      <button class="usar" data-v="${o.v}" ${usada ? 'disabled' : ''}>${usada ? 'Em uso' : 'Usar'}</button></div>`;
+  }).join('');
+  document.querySelectorAll('.play').forEach(b => b.onclick = () => ouvir(b.dataset.v));
+  document.querySelectorAll('.usar').forEach(b => b.onclick = () => usar(b.dataset.v));
+}
+function desenha() { desenhaAgentes(); desenhaLista(); }
+
+async function ouvir(v) {
+  if (audio) { audio.pause(); audio = null; }
+  if (tocandoV === v) { tocandoV = null; desenhaLista(); return; }
+  tocandoV = v; desenhaLista();
+  try {
+    const r = await fetch(FN_VOZ, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agente: atual, voz: v, teste: true, texto: $('frase').value }) });
+    if (!r.ok) throw new Error('voz indisponível');
+    const url = URL.createObjectURL(await r.blob());
+    if (tocandoV !== v) return;
+    audio = new Audio(url); audio.onended = () => { tocandoV = null; desenhaLista(); }; await audio.play();
+  } catch (e) { tocandoV = null; desenhaLista(); aviso('Não consegui tocar essa voz agora.'); }
+}
+async function usar(v) {
+  const { error } = await sb.from('escritorio_vozes').upsert({ agente: atual, voz: v, atualizado_em: new Date().toISOString() });
+  if (error) { aviso('Não consegui salvar. Tente de novo.'); return; }
+  escolhas[atual] = v; desenha();
+  aviso(AGENTES.find(a => a.id === atual).nome.split(' ')[0] + ' agora fala com a voz ' + nomeVoz(v) + '.');
+}
+document.querySelectorAll('#filtros button').forEach(b => b.onclick = () => { filtro = b.dataset.f; desenhaLista(); });
+
+const { data } = await sb.from('escritorio_vozes').select('agente,voz');
+(data || []).forEach(x => escolhas[x.agente] = x.voz);
+$('frase').value = AGENTES[0].frase;
+desenha();
+</script>
+</body>
+</html>

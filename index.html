@@ -817,6 +817,9 @@ const roomId=(x,z)=>{const r=roomAt(x,z);return r?r.id:null};
 function agentRoom(id){const A=ACT[id];return A?roomId(A.x,A.z):null}
 function agentsHere(){if(!S.room)return[];return S.agents.filter(a=>agentRoom(a.id)===S.room)}
 function peopleTalkingHere(){return Object.values(M.peers).some(p=>p.seen&&p.vol>.5)}
+/* gente de verdade na mesma sala: aí os agentes só falam quando chamados pelo nome */
+function humanosNaSala(){if(!S.room)return 0;return Object.values(M.peers).filter(p=>p.seen&&p.room===S.room).length}
+const SO_ESCUTA=/(so (escuta|ouve|ouvindo|escutando)|fica (quieto|quieta|na escuta|so ouvindo)|silencio|fica em silencio|nao (fala|responde) (agora|nada)|deixa eu conversar|espera a gente)/;
 /* chamar pelo nome: só quem foi chamado vem até você */
 function agentComes(id,cb){const A=ACT[id];if(!A)return;
   const dx=ME.x-A.x,dz=ME.z-A.z,d=Math.hypot(dx,dz)||1;A.coming=true;A.calledBy=S.room;A.speed=1.9;
@@ -830,7 +833,7 @@ function onHeard(text){
     if(agentRoom(named)===S.room)startVoice(named,text);
     else{setSay(first(a.nome)+' está vindo…');agentComes(named,()=>startVoice(named,text))}
     return}
-  if(peopleTalkingHere())return; // com gente conversando na sala, só responde quem for chamado pelo nome
+  if(peopleTalkingHere()||humanosNaSala())return; // com gente na sala, só responde quem for chamado pelo nome
   const here=agentsHere();if(!here.length)return;
   let id=V.last&&here.some(a=>a.id===V.last)&&Date.now()-V.lastAt<10*60000?V.last:null;
   if(!id){let bd=1e9;for(const a of here){const A=ACT[a.id];const d=Math.hypot(A.x-ME.x,A.z-ME.z);if(d<bd){bd=d;id=a.id}}}
@@ -853,13 +856,15 @@ function limpaFala(t){return String(t).replace(/\bDra\./g,'Doutora').replace(/\b
 /* voz neural da Microsoft (função "voz" no Supabase); se não estiver configurada, usa a voz do navegador.
    A resposta é falada em pedaços: a primeira frase já toca enquanto as próximas ainda estão sendo escritas. */
 const FN_VOZ='https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/voz';let AUD=null;
+let VOZES_ESC={};async function carregaVozesEsc(){try{const r=await fetch('https://isfyxyoelqmncqxcrvlx.supabase.co/rest/v1/escritorio_vozes?select=agente,voz',{headers:{apikey:'sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z'}});const j=await r.json();if(Array.isArray(j)){const o={};j.forEach(x=>o[x.agente]=x.voz);VOZES_ESC=o}}catch(e){}}
+carregaVozesEsc();setInterval(carregaVozesEsc,30000);
 function pararAudio(){if(AUD){try{AUD.pause()}catch(e){}AUD=null}try{speechSynthesis.cancel()}catch(e){}}
 function falarNavegador(id,texto,fim){const v=vozDe(id),cfg=VOZ[id]||{};const partes=frases(texto).map(x=>x.trim()).filter(Boolean);
   if(!partes.length||!window.speechSynthesis){fim();return}V.utts=[];
   partes.forEach((f,k)=>{const u=new SpeechSynthesisUtterance(f);u.lang='pt-BR';if(v)u.voice=v;u.pitch=cfg.pitch||1;u.rate=(cfg.rate||1.05)*1.08;
     if(k===partes.length-1){u.onend=fim;u.onerror=fim}V.utts.push(u);speechSynthesis.speak(u)})}
 function audioDe(id,texto){if(V.semAzure)return Promise.resolve(null);
-  return fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto})})
+  return fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto,voz:VOZES_ESC[id]||undefined})})
     .then(r=>{if(!r.ok){if(r.status===503)V.semAzure=true;return null}return r.blob()}).catch(()=>null)}
 function falarInicio(id){pararAudio();const fid=V.falaId=(V.falaId||0)+1;V.fila={fid,id,gen:V.gen,itens:[],tocando:false,acabou:false,depois:null,dito:''};
   V.falaTexto='';V.mode='speaking';V.falando=true;return fid}
@@ -893,10 +898,17 @@ function interromper(){if(!V.falando&&!V.pensando)return;V.falaId=(V.falaId||0)+
     else if(dito){ms.push({role:'assistant',content:dito+' (interrompido)'});if(V.agent)memAdd(V.agent,'a',dito)}}}
 function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a)return;
-  if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening'}
+  if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening';V.soEscuta=false}
   V.last=id;V.lastAt=Date.now();V.userAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   if(firstText)userSays(firstText)}
 function userSays(text){const id=V.agent;if(!id||!V.sess)return;text=String(text||'').trim();if(!text)return;
+  const nomeado=nameIn(text),chamado=nomeado===id,n=norm(text);
+  // "Calebe, só escuta": ele fica na conversa, ouvindo, e só volta a falar quando for chamado pelo nome
+  if(SO_ESCUTA.test(n)&&(chamado||!humanosNaSala())){if(V.falando||V.pensando)interromper();V.soEscuta=true;V.userAt=Date.now();
+    setSay(first(agentById(id).nome)+' está só ouvindo. Chame pelo nome quando quiser que ele fale.');return}
+  // com outra pessoa na sala (ou no modo só escuta), frase sem o nome do agente é conversa entre vocês: ele não entra
+  if(!nomeado&&(V.soEscuta||humanosNaSala()||humanIn(text))){V.userAt=Date.now();V.lastAt=Date.now();if(humanIn(text))callHuman(humanIn(text));return}
+  if(chamado&&V.soEscuta){V.soEscuta=false;setSay('')}
   if(V.falando||V.pensando)interromper();
   V.userAt=Date.now();V.lastAt=Date.now();S.talkAt=Date.now();showBubble(ME,text,4000,true);memAdd(id,'u',text);
   const hu=humanIn(text);if(hu)callHuman(hu);
@@ -935,7 +947,7 @@ function voiceGuard(){
   if(!V.agent)return;const A=ACT[V.agent];
   if(A&&!A.coming&&agentRoom(V.agent)!==S.room){endVoice();return}
   // um minuto sem você falar, a conversa fecha sozinha; é só chamar de novo
-  if(!V.falando&&!V.pensando&&Date.now()-V.userAt>60000)endVoice()}
+  if(!V.falando&&!V.pensando&&Date.now()-V.userAt>(V.soEscuta||humanosNaSala()?600000:60000))endVoice()}
 function onRoomChange(prev,now){
   if(V.agent&&agentRoom(V.agent)!==now)endVoice();
   for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
