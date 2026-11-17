@@ -1,7 +1,6 @@
 // Ferramentas do Time de IA no Nostro Hub.
-// Só a função "agente" chama esta (com a chave de serviço do próprio projeto). Cada agente só usa as suas:
-//   Josué  → Geração de Leads (buscar empresas, analisar site) e entregar ao funil de um SDR do Time de IA.
-//   Calebe → o próprio funil no Time de IA (ver, mover, anotar, atualizar contato) e passar a reunião para o Jonathan.
+// Só a função "agente" chama esta (com a chave de serviço do próprio projeto). Cada agente só usa as suas.
+// Hoje o Johnny (id interno "calebe") faz tudo: Geração de Leads (buscar, analisar site, CNPJ), coloca no próprio funil, mexe nele e passa a reunião para o Jonathan.
 // O funil do Jonathan não é mexido aqui: a passagem fica marcada e o Hub cria o negócio quando abre.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { geocodificar, buscarOSM, buscarTomTom, juntarFontes, telefoneBR, analisarSite, consultarCnpj } from "./leads.js";
@@ -10,16 +9,16 @@ const URL_SB = Deno.env.get("SUPABASE_URL") || "";
 const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PERMISSOES: Record<string, string[]> = {
   josue: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "entregar_ao_sdr", "ver_funil"],
-  // o Calebe hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
+  // o Johnny hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
   calebe: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "adicionar_ao_funil", "ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
 };
 const ETAPAS_SDR = ["novo", "abordado", "followup", "respondeu", "qualificando", "qualificado"];
 const NOME_ETAPA: Record<string, string> = {
   encontrado: "Encontrado", diagnostico: "Diagnóstico feito", pronto: "Pronto para o SDR",
-  novo: "Recebido do Josué", abordado: "1ª mensagem enviada", followup: "Em follow-up", respondeu: "Respondeu",
+  novo: "Novo lead", abordado: "1ª mensagem enviada", followup: "Em follow-up", respondeu: "Respondeu",
   qualificando: "Em qualificação", qualificado: "Qualificado", reuniao: "Reunião marcada", descartado: "Descartado",
 };
-const NOME: Record<string, string> = { josue: "Josué", calebe: "Calebe", camila: "Camila", jonathan: "Jonathan", descartado: "Descartados" };
+const NOME: Record<string, string> = { josue: "Josué", calebe: "Johnny", camila: "Camila", jonathan: "Jonathan", descartado: "Descartados" };
 
 const db = (caminho: string, o: RequestInit = {}) =>
   fetch(`${URL_SB}/rest/v1/${caminho}`, { ...o, headers: { apikey: CHAVE, Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json", ...(o.headers || {}) } });
@@ -78,7 +77,7 @@ async function buscaPeloHub(termo: string, local: string): Promise<any> {
   } catch (_e) { return null; }
 }
 
-/* ---------- Josué: Geração de Leads ---------- */
+/* ---------- Geração de Leads ---------- */
 async function buscarEmpresas(a: any) {
   const termo = curto(a.nicho, 120), local = curto(a.local || "Montes Claros, MG", 160);
   if (!termo) return { erro: "Diga o nicho da busca (ex.: dentista)." };
@@ -114,9 +113,9 @@ async function buscarEmpresas(a: any) {
   lugares = lugares.slice(0, 50);
   if (!lugares.length) return { total: 0, aviso: "Não achei empresas com esse nicho nesse local nas bases de mapas gratuitas. Tente outro nome para o nicho." };
 
-  // grava na Geração de Leads do Hub, como uma busca feita pelo Josué
+  // grava na Geração de Leads do Hub, como uma busca feita pelo Johnny
   const bid = "ia-" + Date.now().toString(36);
-  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Calebe)", local, total: lugares.length, paginas: 1 }) });
+  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Johnny)", local, total: lugares.length, paginas: 1 }) });
   const expira = new Date(Date.now() + 30 * 864e5).toISOString();
   await db("pulse_leads", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(lugares.map((l: any) => ({ id: l.id, busca_id: bid, data: { ...l, buscadoPor: "calebe" }, expira_em: expira }))) });
@@ -153,7 +152,7 @@ async function entregarAoSdr(a: any, quem = "josue") {
   if (!empresa) return { erro: "Falta o nome da empresa." };
   const todos = await leadsAgentes();
   const ja = todos.find((l) => sem(l.empresa) === sem(empresa));
-  if (ja) return { erro: `${empresa} já está no Time de IA, com ${NOME[ja.dono] || ja.dono} (${NOME_ETAPA[ja.etapa] || ja.etapa}).` };
+  if (ja) return { erro: `${empresa} já está no Comercial IA, com ${NOME[ja.dono] || ja.dono} (${NOME_ETAPA[ja.etapa] || ja.etapa}).` };
   let base: any = {};
   if (a.lead_id) {
     const r = await db(`pulse_leads?id=eq.${encodeURIComponent(a.lead_id)}&select=id,data`);
@@ -176,14 +175,14 @@ async function entregarAoSdr(a: any, quem = "josue") {
     leadGeradoId: a.lead_id || null, criadoEm: agora, etapaDesde: agora,
     historico: quem === "josue" ? [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }] : [{ dono: sdr, etapa: "novo", em: agora }],
     atividades: quem === "josue"
-      ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Calebe"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
+      ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Johnny"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
       : [{ texto: `${NOME[quem]} encontrou, analisou e deu nota ${a.nota ?? "–"}/10`, em: agora }],
   };
   await salvarAg(l);
   return { ok: true, lead: resumoLead(l) };
 }
 
-/* ---------- funil do Time de IA ---------- */
+/* ---------- funil do Comercial IA ---------- */
 async function verFunil(agente: string, a: any) {
   const todos = await leadsAgentes();
   const meus = agente === "calebe" ? todos.filter((l) => l.dono === "calebe" || (l.sdr === "calebe" && l.dono === "jonathan")) : todos;

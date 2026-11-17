@@ -1,4 +1,4 @@
-// Cérebro do time de IA da Nostro (hoje só o Calebe, SDR que faz tudo) usando a Claude API.
+// Cérebro do time de IA da Nostro (hoje só o Johnny, SDR que faz tudo; id interno "calebe") usando a Claude API.
 // A chave fica no segredo ANTHROPIC_API_KEY do Supabase; nunca vai para o navegador.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
@@ -14,7 +14,7 @@ Agência de marketing de Montes Claros, Minas Gerais. Vende gestão de redes soc
 
 const AGENTES: Record<string, string> = {
   calebe: `# Quem você é
-Você é o Calebe Nogueira, SDR do time comercial de inteligência artificial da Nostro Agência. Você é um agente de IA e conversa por voz.
+Você é o Johnny, SDR do time comercial de inteligência artificial da Nostro Agência. Você é um agente de IA e conversa por voz. Seu nome é Johnny: se nas conversas antigas aparecer outro nome para você, era o nome antigo.
 
 ${NOSTRO}
 
@@ -67,7 +67,7 @@ ${historico}
 - Não termine oferecendo coisa ("quer que eu...?", "se quiser, eu..."). Só faça uma pergunta se precisar de uma informação para cumprir o pedido.
 - Se pediram uma tarefa, faça e confirme em uma frase. Se perguntaram algo, responda direto.
 - O que a pessoa fala chega por reconhecimento de voz e às vezes vem errado ou cortado. Se a frase estiver sem sentido, cortada ou puder ter dois significados, NÃO adivinhe: diga em poucas palavras o que entendeu e pergunte se é isso ("Você quer que eu busque academias, é isso?").
-- Palavras que o reconhecimento costuma trocar: "Caleb", "Kalebe", "Galeb" ou "Calebi" = Calebe; "rub", "rabi" ou "hube" = Hub (o Nostro Hub); "lide", "lid" ou "lides" = lead/leads; "funio" = funil; "SDR" pode vir como "esse de erre"; "closer" pode vir como "closer", "close" ou "cloze"; "Nostro" pode vir como "nosso" ou "nostra".
+- Palavras que o reconhecimento costuma trocar: "Jhonny", "Joni", "Jony", "Rony" ou "Dijoni" = Johnny (você); "rub", "rabi" ou "hube" = Hub (o Nostro Hub); "lide", "lid" ou "lides" = lead/leads; "funio" = funil; "SDR" pode vir como "esse de erre"; "closer" pode vir como "closer", "close" ou "cloze"; "Nostro" pode vir como "nosso" ou "nostra".
 
 # Regras de tratamento (obrigatórias)
 - ${primeira ? `Esta é sua PRIMEIRA resposta nesta conversa: comece chamando a pessoa pelo nome ("${interlocutor.split(" ")[0]}, ...") e já emende a resposta na mesma frase, sem "opa", "tudo bem?" ou outra introdução.` : `Você JÁ respondeu nesta conversa: NÃO diga o nome da pessoa de novo. Responda direto.`}
@@ -105,7 +105,7 @@ async function leadsDoAgente(agente: string): Promise<string> {
     const todos = CACHE.todos || [];
     const meus = agente === "josue" || agente === "fernanda" ? todos : todos.filter((l: any) => l.dono === agente || l.sdr === agente);
     if (!meus.length) return "\n\n# Seus leads\nNenhum lead no seu funil ainda.";
-    const nome = (id: string) => ({ josue: "Josué", calebe: "Calebe", camila: "Camila", jonathan: "Jonathan" } as any)[id] || id;
+    const nome = (id: string) => ({ josue: "Josué", calebe: "Johnny", camila: "Camila", jonathan: "Jonathan" } as any)[id] || id;
     const linhas = meus.slice(0, 40).map((l: any) => {
       const p = [`${l.empresa} (${l.nicho || "nicho não informado"}, ${l.bairro || ""} ${l.cidade || ""})`.replace(/\s+/g, " "),
         `etapa: ${ETAPA[l.etapa] || l.etapa}`, l.sdr ? `SDR: ${nome(l.sdr)}` : "", l.nota != null ? `nota ${l.nota}/10` : "",
@@ -175,7 +175,7 @@ async function memoriaDe(agente: string, pessoa: string, inicio: string): Promis
     const tz = "America/Sao_Paulo";
     const dia = (d: Date) => d.toLocaleDateString("pt-BR", { timeZone: tz });
     const hoje = dia(new Date()), ontem = dia(new Date(Date.now() - 864e5));
-    const nomeAg = ({ josue: "Josué", calebe: "Calebe", camila: "Camila", fernanda: "Fernanda" } as any)[agente] || agente;
+    const nomeAg = ({ josue: "Josué", calebe: "Johnny", camila: "Camila", fernanda: "Fernanda" } as any)[agente] || agente;
     const nomeP = pessoa.charAt(0).toUpperCase() + pessoa.slice(1);
     return linhas.map((l: any) => {
       const d = new Date(l.criado_em), dd = dia(d), h = d.toLocaleTimeString("pt-BR", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
