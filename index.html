@@ -1098,6 +1098,7 @@ async function startMulti(){
     addEventListener('beforeunload',()=>{try{ch.untrack();sb.removeChannel(ch)}catch(e){}});
   }catch(e){console.warn('multi',e)}}
 
+window.__nostro={get V(){return V},get M(){return M},get S(){return S},get ME(){return ME},ACT,onHeard,startVoice,endVoice};
 const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('tempo')),ms))]);
 async function enterOffice(){
   if($('enter').disabled)return;const nm=($('myname').value||'').trim().replace(/\s+/g,' ');if(!nm){$('myname').focus();toast('Escreva seu nome para o time saber quem chegou.');return}
