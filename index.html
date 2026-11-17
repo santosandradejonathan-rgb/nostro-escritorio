@@ -834,7 +834,7 @@ function onHeard(text){
 async function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a||!a.eleven)return;
   if(V.agent===id&&V.conv){if(firstText){try{V.conv.sendUserMessage(firstText)}catch(e){}}return}
-  const gen=++V.gen;V.starting=true;stopNameListening();
+  const gen=++V.gen;V.starting=true;stopNameListening();let answered=false;
   if(V.conv){const old=V.conv;V.conv=null;try{old.setVolume({volume:0})}catch(e){}try{await old.endSession()}catch(e){}}
   V.agent=id;V.last=id;V.lastAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';const historico=memText(id);
@@ -842,11 +842,14 @@ async function startVoice(id,firstText){
   try{
     const conv=await Conversation.startSession({agentId:a.eleven,connectionType:'webrtc',
       dynamicVariables:{interlocutor:M.nome||'Jonathan',sala,historico},
-      onConnect:()=>{if(gen!==V.gen)return;setSay('');if(firstText){try{conv.sendUserMessage(firstText)}catch(e){}}},
+      onConnect:()=>{if(gen!==V.gen)return;setSay('');if(firstText){
+        // espera a conversa ficar pronta antes de mandar a primeira frase; se o agente não responder, manda de novo
+        const send=()=>{if(gen!==V.gen||answered)return;try{(V.conv||conv).sendUserMessage(firstText)}catch(e){}};
+        setTimeout(send,1200);setTimeout(send,6000)}},
       onDisconnect:()=>{if(gen===V.gen&&V.agent===id){V.conv=null;V.agent=null;V.mode=null;setTimeout(startNameListening,400)}},
       onModeChange:({mode})=>{if(gen===V.gen)V.mode=mode},
       onMessage:m=>{if(gen!==V.gen)return;S.talkAt=Date.now();V.lastAt=Date.now();const A=ACT[id];
-        if(m.source==='ai'){memAdd(id,'a',m.message);if(A)showBubble(A,m.message,Math.min(20000,3000+m.message.length*60))}
+        if(m.source==='ai'){answered=true;const txt=String(m.message||'').replace(/\[[^\]]{1,24}\]\s*/g,'').trim();if(!txt)return;memAdd(id,'a',txt);if(A)showBubble(A,txt,Math.min(20000,3000+txt.length*60))}
         else{if(firstText&&norm(m.message)===norm(firstText))return;memAdd(id,'u',m.message);showBubble(ME,m.message,4000,true);
           const hu=humanIn(m.message);if(hu)callHuman(hu);
           const other=nameIn(m.message);if(other&&other!==id){
