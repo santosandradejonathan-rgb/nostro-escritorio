@@ -9,10 +9,10 @@ const ORIGENS = [
 ];
 // voz de cada agente (dá para trocar sem mexer no código com o segredo VOZES_AGENTES em JSON)
 const PADRAO: Record<string, { voz: string; ritmo: string; tom: string }> = {
-  josue: { voz: "pt-BR-AntonioNeural", ritmo: "+4%", tom: "-2%" },
-  calebe: { voz: "pt-BR-DonatoNeural", ritmo: "+6%", tom: "+0%" },
-  camila: { voz: "pt-BR-ThalitaNeural", ritmo: "+5%", tom: "+0%" },
-  fernanda: { voz: "pt-BR-FranciscaNeural", ritmo: "+2%", tom: "+0%" },
+  josue: { voz: "pt-BR-AntonioNeural", ritmo: "+14%", tom: "-2%" },
+  calebe: { voz: "pt-BR-DonatoNeural", ritmo: "+16%", tom: "+0%" },
+  camila: { voz: "pt-BR-ThalitaNeural", ritmo: "+15%", tom: "+0%" },
+  fernanda: { voz: "pt-BR-FranciscaNeural", ritmo: "+12%", tom: "+0%" },
 };
 
 function cors(origem: string | null) {

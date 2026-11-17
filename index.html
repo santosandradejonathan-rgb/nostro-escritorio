@@ -850,39 +850,54 @@ function vozDe(id){const g=(VOZ[id]||{}).g||'m';if(!VOZES.length)carregaVozes();
   if(da.length)return da[i%da.length];return VOZES[0]||null}
 function frases(t){return String(t).replace(/\s+/g,' ').match(/[^.!?…]+[.!?…]*\s*/g)||[t]}
 function limpaFala(t){return String(t).replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ').replace(/\s+/g,' ').trim()}
-/* voz neural da Microsoft (função "voz" no Supabase); se não estiver configurada, usa a voz do navegador */
+/* voz neural da Microsoft (função "voz" no Supabase); se não estiver configurada, usa a voz do navegador.
+   A resposta é falada em pedaços: a primeira frase já toca enquanto as próximas ainda estão sendo escritas. */
 const FN_VOZ='https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/voz';let AUD=null;
 function pararAudio(){if(AUD){try{AUD.pause()}catch(e){}AUD=null}try{speechSynthesis.cancel()}catch(e){}}
 function falarNavegador(id,texto,fim){const v=vozDe(id),cfg=VOZ[id]||{};const partes=frases(texto).map(x=>x.trim()).filter(Boolean);
   if(!partes.length||!window.speechSynthesis){fim();return}V.utts=[];
-  partes.forEach((f,k)=>{const u=new SpeechSynthesisUtterance(f);u.lang='pt-BR';if(v)u.voice=v;u.pitch=cfg.pitch||1;u.rate=cfg.rate||1.05;
+  partes.forEach((f,k)=>{const u=new SpeechSynthesisUtterance(f);u.lang='pt-BR';if(v)u.voice=v;u.pitch=cfg.pitch||1;u.rate=(cfg.rate||1.05)*1.08;
     if(k===partes.length-1){u.onend=fim;u.onerror=fim}V.utts.push(u);speechSynthesis.speak(u)})}
-function falar(id,texto,depois){const gen=V.gen;pararAudio();texto=limpaFala(texto);if(!texto){depois&&depois();return}const fid=V.falaId=(V.falaId||0)+1;V.falaTexto=norm(texto);
-  const A=ACT[id];V.mode='speaking';V.falando=true;if(A)showBubble(A,texto,Math.min(25000,3000+texto.length*65));
-  let feito=false;const fim=()=>{if(feito||gen!==V.gen||fid!==V.falaId)return;feito=true;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+700;V.userAt=Date.now();depois&&depois()};
-  const plano=()=>{if(gen===V.gen&&!feito&&fid===V.falaId)falarNavegador(id,texto,fim)};
-  if(V.semAzure){plano();return}
-  fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto})})
-    .then(async r=>{if(gen!==V.gen||fid!==V.falaId)return;if(!r.ok){if(r.status===503)V.semAzure=true;plano();return}
-      const b=await r.blob();if(gen!==V.gen||fid!==V.falaId)return;const url=URL.createObjectURL(b);const au=new Audio(url);AUD=au;
-      au.onended=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;fim()};au.onerror=()=>{if(AUD===au)AUD=null;plano()};
-      au.play().catch(()=>{if(AUD===au)AUD=null;plano()})})
-    .catch(()=>plano())}
+function audioDe(id,texto){if(V.semAzure)return Promise.resolve(null);
+  return fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:id,texto})})
+    .then(r=>{if(!r.ok){if(r.status===503)V.semAzure=true;return null}return r.blob()}).catch(()=>null)}
+function falarInicio(id){pararAudio();const fid=V.falaId=(V.falaId||0)+1;V.fila={fid,id,gen:V.gen,itens:[],tocando:false,acabou:false,depois:null,dito:''};
+  V.falaTexto='';V.mode='speaking';V.falando=true;return fid}
+function falarParte(texto){const q=V.fila;if(!q||q.fid!==V.falaId)return;texto=limpaFala(texto);if(!texto)return;
+  q.dito+=(q.dito?' ':'')+texto;V.falaTexto=norm(q.dito);const A=ACT[q.id];if(A)showBubble(A,q.dito,Math.min(30000,4000+q.dito.length*70));
+  q.itens.push({texto,audio:audioDe(q.id,texto)});if(!q.tocando)tocarProximo()}
+function falarFim(depois){const q=V.fila;if(!q||q.fid!==V.falaId)return;q.acabou=true;q.depois=depois||null;if(!q.tocando&&!q.itens.length)falaTerminou(q)}
+function falaTerminou(q){if(q.fid!==V.falaId||q.gen!==V.gen)return;V.falando=false;V.mode='listening';V.mudoAte=Date.now()+500;V.userAt=Date.now();const d=q.depois;q.depois=null;d&&d()}
+async function tocarProximo(){const q=V.fila;if(!q||q.fid!==V.falaId)return;const it=q.itens.shift();
+  if(!it){q.tocando=false;if(q.acabou)falaTerminou(q);return}q.tocando=true;
+  const proximo=()=>{if(q.fid===V.falaId&&q.gen===V.gen)tocarProximo()};
+  const b=await it.audio;if(q.fid!==V.falaId||q.gen!==V.gen)return;
+  if(!b){falarNavegador(q.id,it.texto,proximo);return}
+  const url=URL.createObjectURL(b);const au=new Audio(url);AUD=au;
+  au.onended=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;proximo()};
+  au.onerror=()=>{if(AUD===au)AUD=null;falarNavegador(q.id,it.texto,proximo)};
+  au.play().catch(()=>{if(AUD===au)AUD=null;falarNavegador(q.id,it.texto,proximo)})}
+function falar(id,texto,depois){falarInicio(id);falarParte(texto);falarFim(depois)}
 /* cortar o agente no meio da fala: pela voz (palavra de parada ou o nome dele) ou pela tecla Esc */
 const PARADA=/(^| )(espera|espere|pera|perai|peraí|calma|chega|para|pare|deixa|entendi|ta bom|beleza|ok|mas|so um minuto|um minuto|opa|o )( |$)/;
 function ehEco(t){const w=norm(t).split(/[^a-z0-9]+/).filter(x=>x.length>2);if(!w.length)return 1;const f=V.falaTexto||'';return w.filter(x=>f.includes(x)).length/w.length}
 function querCortar(t){if(!V.falando)return false;const n=norm(t).replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();if(!n)return false;
   const eco=ehEco(t);const nome=V.agent&&nameIn(t)===V.agent;const palavras=n.split(' ').length;
   if((PARADA.test(n)||nome)&&eco<.6)return true;return palavras>=4&&eco<.3}
-function interromper(){if(!V.falando)return;V.falaId=(V.falaId||0)+1;pararAudio();V.falando=false;V.mode='listening';V.mudoAte=0;V.userAt=Date.now();
+function interromper(){if(!V.falando&&!V.pensando)return;V.falaId=(V.falaId||0)+1;pararAudio();
+  if(V.ctl){try{V.ctl.abort()}catch(e){}V.ctl=null}
+  const dito=V.fila?V.fila.dito:'';V.falando=false;V.pensando=false;V.mode='listening';V.mudoAte=0;V.userAt=Date.now();setSay('');
   const A=ACT[V.agent];if(A&&A.bubble){A.p.root.remove(A.bubble);A.bubble=null}
-  if(V.sess&&V.sess.msgs.length){const m=V.sess.msgs[V.sess.msgs.length-1];if(m.role==='assistant'&&!/\(interrompido\)$/.test(m.content))m.content+=' (interrompido)'}}
+  if(V.sess){const ms=V.sess.msgs,m=ms[ms.length-1];
+    if(m&&m.role==='assistant'){if(!/\(interrompido\)$/.test(m.content))m.content+=' (interrompido)'}
+    else if(dito){ms.push({role:'assistant',content:dito+' (interrompido)'});if(V.agent)memAdd(V.agent,'a',dito)}}}
 function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a)return;
   if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening'}
   V.last=id;V.lastAt=Date.now();V.userAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   if(firstText)userSays(firstText)}
 function userSays(text){const id=V.agent;if(!id||!V.sess)return;text=String(text||'').trim();if(!text)return;
+  if(V.falando||V.pensando)interromper();
   V.userAt=Date.now();V.lastAt=Date.now();S.talkAt=Date.now();showBubble(ME,text,4000,true);memAdd(id,'u',text);
   const hu=humanIn(text);if(hu)callHuman(hu);
   const other=nameIn(text);if(other&&other!==id){
@@ -891,18 +906,27 @@ function userSays(text){const id=V.agent;if(!id||!V.sess)return;text=String(text
     return}
   if(isFarewell(text)){const tchau=['Falou, até mais!','Beleza, até daqui a pouco.','Fechado, qualquer coisa me chama.','Até mais!'];
     const t=tchau[Math.floor(Math.random()*tchau.length)];memAdd(id,'a',t);const g=V.gen;falar(id,t,()=>{if(g===V.gen)endVoice()});return}
-  V.sess.msgs.push({role:'user',content:text});pensar()}
+  const ms=V.sess.msgs,ult=ms[ms.length-1];if(ult&&ult.role==='user')ult.content+=' '+text;else ms.push({role:'user',content:text});pensar()}
 async function pensar(){const id=V.agent,ss=V.sess;if(!id||!ss)return;const gen=V.gen;
   if(V.ctl){try{V.ctl.abort()}catch(e){}}const ctl=new AbortController();V.ctl=ctl;V.pensando=true;
-  const a=agentById(id);setSay(first(a.nome)+' está pensando…');
-  const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';
+  const a=agentById(id);const tPensa=setTimeout(()=>{if(V.ctl===ctl&&!V.falando)setSay(first(a.nome)+' está pensando…')},900);
+  const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';let total='',pend='',fid=0;
+  const abrev=t=>t.replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor');
   try{const r=await fetch(FN_AGENTE,{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({agente:id,interlocutor:M.nome||'Jonathan',sala,historico:ss.hist,mensagens:ss.msgs.slice(-20)})});
-    const j=await r.json().catch(()=>({}));if(gen!==V.gen||ctl!==V.ctl)return;V.pensando=false;V.ctl=null;setSay('');
-    if(!r.ok||!j.texto){setSay(first(a.nome)+' não conseguiu responder agora. Tente de novo.');setTimeout(()=>setSay(''),5000);ss.msgs.pop();return}
-    ss.msgs.push({role:'assistant',content:j.texto});memAdd(id,'a',j.texto);falar(id,j.texto)}
-  catch(e){if(e.name==='AbortError')return;if(gen===V.gen){V.pensando=false;setSay('Sem conexão com '+first(a.nome)+'. Confira a internet.');setTimeout(()=>setSay(''),5000)}}}
-function endVoice(semOuvir){V.gen++;const id=V.agent;V.agent=null;V.sess=null;V.mode=null;V.falando=false;V.pensando=false;
+      body:JSON.stringify({agente:id,interlocutor:M.nome||'Jonathan',sala,historico:ss.hist,mensagens:ss.msgs.slice(-20),stream:true})});
+    if(gen!==V.gen||ctl!==V.ctl)return;
+    if(!r.ok||!r.body){clearTimeout(tPensa);V.pensando=false;V.ctl=null;setSay(first(a.nome)+' não conseguiu responder agora. Tente de novo.');setTimeout(()=>setSay(''),5000);return}
+    const rd=r.body.getReader(),dec=new TextDecoder();
+    for(;;){const {value,done}=await rd.read();if(gen!==V.gen||ctl!==V.ctl)return;if(done)break;
+      const t=dec.decode(value,{stream:true});total+=t;pend=abrev(pend+t);
+      let m;while((m=pend.match(/^([\s\S]*?[.!?…])\s+/))&&m[1].trim().length>=8){
+        if(!fid){clearTimeout(tPensa);setSay('');fid=falarInicio(id)}if(fid!==V.falaId)return;falarParte(m[1].trim());pend=pend.slice(m[0].length)}}
+    clearTimeout(tPensa);V.pensando=false;V.ctl=null;setSay('');total=total.trim();
+    if(!total){setSay(first(a.nome)+' não conseguiu responder agora. Tente de novo.');setTimeout(()=>setSay(''),5000);return}
+    if(!fid)fid=falarInicio(id);if(fid!==V.falaId)return;if(pend.trim())falarParte(pend.trim());
+    ss.msgs.push({role:'assistant',content:total});memAdd(id,'a',total);falarFim()}
+  catch(e){clearTimeout(tPensa);if(e.name==='AbortError')return;if(gen===V.gen&&ctl===V.ctl){V.pensando=false;V.ctl=null;setSay('Sem conexão com '+first(a.nome)+'. Confira a internet.');setTimeout(()=>setSay(''),5000)}}}
+function endVoice(semOuvir){V.gen++;const id=V.agent;V.agent=null;V.sess=null;V.mode=null;V.falando=false;V.pensando=false;V.fila=null;
   if(V.ctl){try{V.ctl.abort()}catch(e){}V.ctl=null}pararAudio();
   if(id){const A=ACT[id];if(A&&A.bubble){A.p.root.remove(A.bubble);A.bubble=null}}
   setSay('');if(!semOuvir)startNameListening()}
@@ -915,15 +939,18 @@ function voiceGuard(){
 function onRoomChange(prev,now){
   if(V.agent&&agentRoom(V.agent)!==now)endVoice();
   for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
-/* ouvir o tempo todo; enquanto o agente fala, o que o microfone pega é ignorado (é a própria voz dele) */
+/* ouvir o tempo todo. Você terminou de falar quando fica ~0,9 s em silêncio (não espera o navegador fechar a frase).
+   Enquanto o agente fala, o que o microfone pega só serve para cortar a fala dele. */
+function ouviu(t){if(Date.now()<(V.mudoAte||0))return;
+  if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Calebe, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}
 function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
-  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;
-  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const t=ev.results[i][0].transcript.trim();if(t.length<2)continue;
-    if(V.falando){if(querCortar(t)){interromper();if(!ev.results[i].isFinal)continue}else continue}
-    if(!ev.results[i].isFinal)continue;
-    if(Date.now()<(V.mudoAte||0))continue;
-    if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Calebe, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}};
-  r.onend=()=>{V.rec=null;if(V.recWanted)setTimeout(startNameListening,300)};
+  if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;const feitos=new Set();
+  r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const res=ev.results[i],t=res[0].transcript.trim();if(t.length<2)continue;
+    if(V.falando){if(querCortar(t))interromper();else{clearTimeout(V.silT);continue}}
+    if(feitos.has(i))continue;
+    if(res.isFinal){clearTimeout(V.silT);feitos.add(i);ouviu(t);continue}
+    clearTimeout(V.silT);V.silT=setTimeout(()=>{if(feitos.has(i)||V.falando)return;feitos.add(i);ouviu(t)},900)}};
+  r.onend=()=>{clearTimeout(V.silT);V.rec=null;if(V.recWanted)setTimeout(startNameListening,250)};
   r.onerror=e=>{if(e.error==='not-allowed'){V.recWanted=false;setSay('Permita o microfone para conversar com o time.')}};
   try{r.start()}catch(e){V.rec=null}}
 function stopNameListening(){V.recWanted=false;if(V.rec){const r=V.rec;V.rec=null;try{r.onend=null;r.abort()}catch(e){}}}
@@ -950,7 +977,7 @@ function walkToAgent(id){const A=ACT[id];if(!A)return;S.dismissed=null;setFree(f
 const typing=()=>{const el=document.activeElement;return el&&(el.tagName==='TEXTAREA'||el.tagName==='INPUT'||el.tagName==='SELECT')};
 const KEYS={ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,w:1,a:1,s:1,d:1};
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){if(V.falando){interromper();return}document.activeElement&&document.activeElement.blur();return}
+  if(e.key==='Escape'){if(V.falando||V.pensando){interromper();return}document.activeElement&&document.activeElement.blur();return}
   if(typing())return;if(S.edit&&S.sel&&(e.key==='r'||e.key==='R')){rotateSel(e.shiftKey?-Math.PI/4:Math.PI/4);return}if(S.edit&&e.key==='Escape'){setEdit(false);return}const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k]){audio();S.keys[k]=true;e.preventDefault()}
 });
 document.addEventListener('keyup',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k])S.keys[k]=false});

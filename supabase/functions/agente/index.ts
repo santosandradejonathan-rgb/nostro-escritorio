@@ -141,8 +141,11 @@ ${historico}
 - Fale como colega de trabalho: frases curtas, espontâneas, com opinião própria. Pode concordar, discordar, comentar o dia e fazer uma piada leve quando couber.
 - Se não souber algo, diga que não sabe. Se a pessoa se despedir ou sair, responda só com uma despedida curta.
 
-# Formato da resposta (vai ser lida em voz alta)
-- Português do Brasil falado. No máximo 3 frases curtas, a não ser que peçam detalhe.
+# Formato da resposta (vai ser lida em voz alta, numa conversa ao vivo)
+- Português do Brasil falado, do jeito que se fala no dia a dia de Minas: "tô", "pra", "né", "tá", "a gente", "olha", "então". Sem exagerar nem forçar sotaque.
+- Curto: na maioria das vezes 1 ou 2 frases. Só se estenda se pedirem detalhe, e mesmo assim vá por partes e pergunte se quer que continue.
+- Comece pela resposta, sem rodeio e sem repetir a pergunta. Frases curtas, uma ideia por frase.
+- Nada de tom de relatório, de lista falada ou de "primeiro, segundo, terceiro".
 - Sem markdown, sem listas, sem asteriscos, sem emojis, sem marcações entre colchetes.
 - Escreva números e siglas do jeito que se fala quando ajudar a leitura.
 - O que a pessoa diz chega por reconhecimento de voz e pode ter palavras trocadas. Entenda pelo contexto.`;
@@ -153,13 +156,17 @@ const ETAPA: Record<string, string> = {
   novo: "novo, ainda não abordado", abordado: "abordado", followup: "em follow-up", respondeu: "respondeu",
   qualificando: "qualificando", qualificado: "qualificado", reuniao: "reunião com o Jonathan", descartado: "descartado",
 };
+let CACHE: { t: number; todos: any[] | null } = { t: 0, todos: null };
 async function leadsDoAgente(agente: string): Promise<string> {
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!url || !k) return "";
-    const r = await fetch(`${url}/rest/v1/pulse_agentes?select=data`, { headers: { apikey: k, Authorization: `Bearer ${k}` } });
-    if (!r.ok) return "";
-    const todos = (await r.json()).map((x: any) => x.data || {});
+    if (!CACHE.todos || Date.now() - CACHE.t > 60000) {
+      const r = await fetch(`${url}/rest/v1/pulse_agentes?select=data`, { headers: { apikey: k, Authorization: `Bearer ${k}` } });
+      if (!r.ok) return "";
+      CACHE = { t: Date.now(), todos: (await r.json()).map((x: any) => x.data || {}) };
+    }
+    const todos = CACHE.todos || [];
     const meus = agente === "josue" || agente === "fernanda" ? todos : todos.filter((l: any) => l.dono === agente || l.sdr === agente);
     if (!meus.length) return "\n\n# Seus leads\nNenhum lead no seu funil ainda.";
     const nome = (id: string) => ({ josue: "Josué", calebe: "Calebe", camila: "Camila", jonathan: "Jonathan" } as any)[id] || id;
@@ -222,6 +229,7 @@ Deno.serve(async (req) => {
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ erro: "sem fala do usuário" }, 400);
 
   const leads = await leadsDoAgente(String(corpo.agente));
+  const stream = !!corpo.stream;
   let r: Response;
   try {
    r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -231,12 +239,46 @@ Deno.serve(async (req) => {
       model: MODELO,
       max_tokens: 700,
       thinking: { type: "disabled" },
-      system: base + leads + COMUM(interlocutor, sala, historico, agora),
+      stream,
+      // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
+      system: [
+        { type: "text", text: base + leads, cache_control: { type: "ephemeral" } },
+        { type: "text", text: COMUM(interlocutor, sala, historico, agora) },
+      ],
       messages: msgs,
     }),
    });
   } catch (_e) {
     return json({ erro: "não consegui falar com a Claude API" }, 502);
+  }
+  if (stream && r.ok && r.body) {
+    // repassa só o texto, pedaço a pedaço, para o escritório já começar a falar
+    const rd = r.body.getReader(), dec = new TextDecoder(), enc = new TextEncoder();
+    const saida = new ReadableStream({
+      async start(ctrl) {
+        let buf = "";
+        try {
+          for (;;) {
+            const { value, done } = await rd.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf("\n")) >= 0) {
+              const linha = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+              if (!linha.startsWith("data:")) continue;
+              try {
+                const ev = JSON.parse(linha.slice(5).trim());
+                if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+                  ctrl.enqueue(enc.encode(String(ev.delta.text).replace(/[*_#`]/g, "")));
+                }
+              } catch { /* linha incompleta */ }
+            }
+          }
+        } catch { /* conexão caiu */ }
+        ctrl.close();
+      },
+    });
+    return new Response(saida, { headers: { ...h, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
   const d = await r.json().catch(() => ({}));
   if (!r.ok) return json({ erro: d?.error?.message || "falha na Claude API", status: r.status }, 502);
