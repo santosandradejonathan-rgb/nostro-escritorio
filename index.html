@@ -804,7 +804,9 @@ const V={agent:null,sess:null,mode:null,starting:false,rec:null,recWanted:false,
 function memKey(id){return 'nostro.mem.'+id+'.'+norm(M.nome||'jonathan')}
 function memGet(id){try{return JSON.parse(localStorage.getItem(memKey(id))||'[]')}catch(e){return[]}}
 function memAdd(id,who,text){text=String(text||'').trim();if(!text)return;const m=memGet(id);const prev=m[m.length-1];
-  if(prev&&prev.w===who&&Date.now()-prev.ts<4000&&prev.t===text)return;m.push({w:who,t:text.slice(0,400),ts:Date.now()});while(m.length>40)m.shift();try{localStorage.setItem(memKey(id),JSON.stringify(m))}catch(e){}}
+  if(prev&&prev.w===who&&Date.now()-prev.ts<4000&&prev.t===text)return;m.push({w:who,t:text.slice(0,400),ts:Date.now()});while(m.length>40)m.shift();try{localStorage.setItem(memKey(id),JSON.stringify(m))}catch(e){}
+  try{fetch('https://isfyxyoelqmncqxcrvlx.supabase.co/rest/v1/escritorio_memoria',{method:'POST',headers:{apikey:'sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z','Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({agente:id,pessoa:pessoaMem(),quem:who,texto:text.slice(0,1200)})}).catch(()=>{})}catch(e){}}
+function pessoaMem(){return norm(first(M.nome||'Jonathan'))||'jonathan'}
 function memText(id){const a=agentById(id);const m=memGet(id).slice(-24);if(!m.length)return 'Nenhuma conversa anterior. É a primeira vez que vocês conversam.';
   const now=new Date();const fmt=ts=>{const d=new Date(ts);const dias=Math.floor((new Date(now.toDateString())-new Date(d.toDateString()))/864e5);const h=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});return dias===0?'hoje '+h:dias===1?'ontem '+h:d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+h};
   return m.map(x=>`[${fmt(x.ts)}] ${x.w==='u'?first(M.nome||'Jonathan'):first(a.nome)}: ${x.t}`).join('\n')}
@@ -821,9 +823,12 @@ function peopleTalkingHere(){return Object.values(M.peers).some(p=>p.seen&&p.vol
 const VOC_M=/^(cara|mano|manin|maninho|brother|bro|parceiro|parca|rapaz|moco|veio|vei|irmao|meu amigo|meu chapa|meu querido|campeao|jovem|meu rei)$/;
 const VOC_F=/^(moca|menina|querida|amiga|minha amiga|mulher|garota|dona|minha querida|mocinha|princesa|flor|colega)$/;
 function generoChamado(t){const w=norm(t).replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);if(!w.length)return null;
-  const pedacos=[w[0],w.slice(0,2).join(' '),w[1],w[w.length-1],w.slice(-2).join(' ')].filter(Boolean);
-  if(w[0]==='o'||w[0]==='oi'||w[0]==='e'||w[0]==='ei'||w[0]==='opa'||w[0]==='fala'){pedacos.push(w[1]||'',w.slice(1,3).join(' '))}
-  for(const x of pedacos){if(VOC_M.test(x))return 'm';if(VOC_F.test(x))return 'f'}return null}
+  const INTERJ=['e','ai','eai','oi','ei','opa','fala','salve','beleza','bom','dia','boa','tarde','noite','ola','hey'];
+  let k=0;while(k<w.length-1&&INTERJ.includes(w[k]))k++;
+  const artigo=w[k]==='o'||w[k]==='a';if(artigo&&k<w.length-1)k++;
+  const prox=w[k+1]||'';const ehArtigo=artigo&&/^(da|do|de|das|dos|que|ali|la|aqui|novo|nova)$/.test(prox);
+  const ini=[w[k],w.slice(k,k+2).join(' ')],fim=[w[w.length-1],w.slice(-2).join(' ')];
+  for(const x of (ehArtigo?[]:ini).concat(fim)){if(VOC_M.test(x))return 'm';if(VOC_F.test(x))return 'f'}return null}
 function agentePorGenero(g){const here=agentsHere().filter(a=>a.genero===g);if(!here.length)return null;
   if(V.last&&here.some(a=>a.id===V.last)&&Date.now()-V.lastAt<10*60000)return V.last;
   let id=null,bd=1e9;for(const a of here){const A=ACT[a.id];const d=Math.hypot(A.x-ME.x,A.z-ME.z);if(d<bd){bd=d;id=a.id}}return id}
@@ -909,7 +914,7 @@ function interromper(){if(!V.falando&&!V.pensando)return;V.falaId=(V.falaId||0)+
     else if(dito){ms.push({role:'assistant',content:dito+' (interrompido)'});if(V.agent)memAdd(V.agent,'a',dito)}}}
 function startVoice(id,firstText){
   if(!V.entered)return;const a=agentById(id);if(!a)return;
-  if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[]};V.mode='listening';V.soEscuta=false}
+  if(V.agent!==id){endVoice(true);V.gen++;V.agent=id;V.sess={hist:memText(id),msgs:[],inicio:new Date().toISOString()};V.mode='listening';V.soEscuta=false}
   V.last=id;V.lastAt=Date.now();V.userAt=Date.now();S.talkTo=id;S.talkAt=Date.now();
   if(firstText)userSays(firstText)}
 function userSays(text){const id=V.agent;if(!id||!V.sess)return;text=String(text||'').trim();if(!text)return;
@@ -937,7 +942,7 @@ async function pensar(){const id=V.agent,ss=V.sess;if(!id||!ss)return;const gen=
   const sala=(ROOMS.find(r=>r.id===S.room)||{}).nome||'Sala Comercial';let total='',pend='',fid=0;
   const abrev=t=>t.replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor');
   try{const r=await fetch(FN_AGENTE,{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({agente:id,interlocutor:M.nome||'Jonathan',sala,historico:ss.hist,mensagens:ss.msgs.slice(-20),stream:true})});
+      body:JSON.stringify({agente:id,interlocutor:M.nome||'Jonathan',pessoa:pessoaMem(),inicio:ss.inicio,sala,historico:ss.hist,mensagens:ss.msgs.slice(-20),stream:true})});
     if(gen!==V.gen||ctl!==V.ctl)return;
     if(!r.ok||!r.body){clearTimeout(tPensa);V.pensando=false;V.ctl=null;setSay(first(a.nome)+' não conseguiu responder agora. Tente de novo.');setTimeout(()=>setSay(''),5000);return}
     const rd=r.body.getReader(),dec=new TextDecoder();

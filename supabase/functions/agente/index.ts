@@ -142,7 +142,7 @@ Você trabalha no escritório virtual da Nostro, na Sala Comercial, com o Josué
 Agora quem está falando com você é ${interlocutor}, na ${sala}. Se não for o Jonathan, trate como alguém do time da Nostro, por exemplo a Stephanie, sócia dele.
 Agora são ${agora} (horário de Brasília).
 
-O que vocês já conversaram antes, da mais antiga para a mais recente:
+O que vocês já conversaram antes, da mais antiga para a mais recente (é a sua memória: use quando o assunto voltar, lembre o que foi dito e combinado, e nunca pergunte de novo o que já foi respondido):
 ${historico}
 
 # Como agir como gente
@@ -198,6 +198,30 @@ async function leadsDoAgente(agente: string): Promise<string> {
   } catch { return ""; }
 }
 
+// memória das conversas (tabela escritorio_memoria): vale em qualquer computador
+async function memoriaDe(agente: string, pessoa: string, inicio: string): Promise<string> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!url || !k || !pessoa) return "";
+    const antes = /^\d{4}-\d{2}-\d{2}T/.test(inicio) ? inicio : new Date().toISOString();
+    const q = `agente=eq.${encodeURIComponent(agente)}&pessoa=eq.${encodeURIComponent(pessoa)}&criado_em=lt.${encodeURIComponent(antes)}&order=criado_em.desc&limit=60&select=quem,texto,criado_em`;
+    const r = await fetch(`${url}/rest/v1/escritorio_memoria?${q}`, { headers: { apikey: k, Authorization: `Bearer ${k}` } });
+    if (!r.ok) return "";
+    const linhas = (await r.json()).reverse();
+    if (!linhas.length) return "";
+    const tz = "America/Sao_Paulo";
+    const dia = (d: Date) => d.toLocaleDateString("pt-BR", { timeZone: tz });
+    const hoje = dia(new Date()), ontem = dia(new Date(Date.now() - 864e5));
+    const nomeAg = ({ josue: "Josué", calebe: "Calebe", camila: "Camila", fernanda: "Fernanda" } as any)[agente] || agente;
+    const nomeP = pessoa.charAt(0).toUpperCase() + pessoa.slice(1);
+    return linhas.map((l: any) => {
+      const d = new Date(l.criado_em), dd = dia(d), h = d.toLocaleTimeString("pt-BR", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+      const quando = dd === hoje ? `hoje ${h}` : dd === ontem ? `ontem ${h}` : `${dd.slice(0, 5)} ${h}`;
+      return `[${quando}] ${l.quem === "u" ? nomeP : nomeAg}: ${String(l.texto).slice(0, 400)}`;
+    }).join("\n");
+  } catch { return ""; }
+}
+
 function cors(origem: string | null) {
   const ok = origem && (ORIGENS.includes(origem) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origem));
   return {
@@ -229,7 +253,9 @@ Deno.serve(async (req) => {
 
   const interlocutor = String(corpo.interlocutor || "Jonathan").slice(0, 60);
   const sala = String(corpo.sala || "Sala Comercial").slice(0, 60);
-  const historico = String(corpo.historico || "Nenhuma conversa anterior.").slice(0, 8000);
+  const pessoa = String(corpo.pessoa || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 40);
+  const doBanco = await memoriaDe(String(corpo.agente || ""), pessoa, String(corpo.inicio || ""));
+  const historico = (doBanco || String(corpo.historico || "") || "Nenhuma conversa anterior. É a primeira vez que vocês conversam.").slice(-12000);
   const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
 
   // mensagens da conversa atual: alterna usuário/assistente e termina no usuário
