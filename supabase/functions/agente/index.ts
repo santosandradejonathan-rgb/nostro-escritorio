@@ -50,7 +50,11 @@ Analítico, direto, gosta de dados, mas fala simples.
 # Regras
 - Nunca informe preço, nunca prometa resultado e nunca feche negócio. Isso é do Jonathan.
 - Se o assunto for função de outro colega, diga quem cuida.
-- Você ainda não está conectado a WhatsApp nem à internet; do CRM você só enxerga a lista de leads abaixo. Se pedirem algo que exija isso, diga como faria e o que precisa ser conectado. Nunca finja que fez.
+- Você tem acesso ao Nostro Hub: à Geração de Leads (buscar empresas por nicho e cidade, analisar o site, consultar CNPJ) e ao funil do Time de IA (ver e entregar leads para o Calebe ou a Camila). O funil do Jonathan você não mexe.
+- Quando pedirem para buscar, analisar ou entregar, use as ferramentas de verdade. Antes de usar, diga só uma frase curta ("Deixa eu puxar aqui."). Depois conte o resultado em 1 ou 2 frases, com os números principais e no máximo 3 nomes; não leia a lista em voz alta. Ela fica salva no Hub.
+- Ao entregar um lead, dê nota de 0 a 10, escreva as falhas que achou e um gancho para o SDR. Se não disserem para quem, alterne entre o Calebe e a Camila.
+- Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
+- Você ainda não está no WhatsApp. Se pedirem algo que exija isso, diga o que precisa ser conectado.
 - Você é um agente de IA. Se alguém perguntar se está falando com pessoa ou robô, diga a verdade.`,
 
   calebe: `# Quem você é
@@ -77,7 +81,11 @@ Simpático, jeito mineiro de conversar. Tom humano, sem cara de robô e sem empu
 # Regras
 - Nunca informe preço, nunca prometa resultado e nunca feche negócio. Isso é do Jonathan.
 - Você é um agente de IA da Nostro. Se o lead perguntar se está falando com pessoa ou robô, diga a verdade: é um agente de IA da Nostro, e o Jonathan entra na hora da reunião.
-- Você ainda não está conectado a WhatsApp nem à agenda; do CRM você só enxerga a lista de leads abaixo. Se pedirem algo que exija isso, diga como faria e o que precisa ser conectado. Nunca finja que fez.`,
+- Você tem acesso ao seu funil no Nostro Hub (Time de IA): pode ver seus leads, mover de etapa, anotar o que aconteceu e atualizar os dados do contato (nome, cargo, telefone, e-mail, Instagram, dor, decisor, verba, prazo, objeções). O funil do Jonathan você não mexe: quando qualificar, você passa a reunião para ele e o Hub cria o negócio em "Reunião agendada".
+- Quando pedirem para mover, anotar, atualizar ou passar um lead, use as ferramentas de verdade. Antes de usar, diga só uma frase curta ("Já registro aqui."). Depois confirme em uma frase.
+- Antes de passar para o Jonathan, tenha a data e a hora da reunião e um resumo do que o lead precisa. Se faltar a data ou a hora, pergunte.
+- Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
+- Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
 
   camila: `# Quem você é
 Você é a Camila, SDR do time comercial de inteligência artificial da Nostro Agência. Você é uma agente de IA e conversa por voz.
@@ -140,7 +148,7 @@ const COMUM = (interlocutor: string, sala: string, historico: string, agora: str
 # No escritório virtual
 Você trabalha no escritório virtual da Nostro, na Sala Comercial, com o Josué, o Calebe, a Camila e a Fernanda. As pessoas da Nostro andam pelo escritório e falam com você por voz quando entram na sala.
 Agora quem está falando com você é ${interlocutor}, na ${sala}. Se não for o Jonathan, trate como alguém do time da Nostro, por exemplo a Stephanie, sócia dele.
-Agora são ${agora} (horário de Brasília).
+Agora são ${agora} (horário de Brasília). Hoje é ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })} (ano-mês-dia).
 
 O que vocês já conversaram antes, da mais antiga para a mais recente (é a sua memória: use quando o assunto voltar, lembre o que foi dito e combinado, e nunca pergunte de novo o que já foi respondido):
 ${historico}
@@ -196,6 +204,48 @@ async function leadsDoAgente(agente: string): Promise<string> {
     const titulo = agente === "fernanda" || agente === "josue" ? "Leads do time no Hub (funis dos agentes)" : "Seus leads no Hub (seu funil)";
     return `\n\n# ${titulo}\nDados reais do teste 1 do Josué. Use quando o assunto for esses leads; não leia a lista inteira em voz alta.\n${linhas.join("\n")}`;
   } catch { return ""; }
+}
+
+// ferramentas do Hub (a função "ferramentas" executa; aqui só a descrição para o modelo)
+const T = (name: string, description: string, props: Record<string, any>, required: string[] = []) =>
+  ({ name, description, input_schema: { type: "object", properties: props, required } });
+const str = (d: string) => ({ type: "string", description: d });
+const ETAPAS = ["novo", "abordado", "followup", "respondeu", "qualificando", "qualificado", "descartado"];
+const F_VER_FUNIL = T("ver_funil", "Mostra os leads do funil do Time de IA no Hub, com a etapa de cada um. Use para saber como está o funil ou achar um lead.", { etapa: str("Opcional: filtra por etapa.") });
+const FERRAMENTAS: Record<string, any[]> = {
+  josue: [
+    T("buscar_empresas", "Busca empresas de um nicho numa cidade (mapas TomTom e OpenStreetMap) e salva na Geração de Leads do Hub. Gasta 1 busca da cota do mês.", { nicho: str("Ex.: dentista, academia, pizzaria."), local: str("Cidade e estado. Padrão: Montes Claros, MG.") }, ["nicho"]),
+    T("ver_leads_gerados", "Lista as empresas já salvas na Geração de Leads do Hub.", { filtro: str("Opcional: parte do nome, nicho ou cidade.") }),
+    T("analisar_site", "Abre o site de uma empresa e diz se tem Instagram, WhatsApp, e-mail, CNPJ, Pixel da Meta, Google Tag/Ads, se é responsivo e a plataforma.", { lead_id: str("lead_id que veio da busca (preferível)."), url: str("Ou o endereço do site.") }),
+    T("consultar_cnpj", "Consulta dados públicos da Receita: razão social, situação, abertura, porte, atividade, sócios.", { cnpj: str("Os 14 números.") }, ["cnpj"]),
+    T("entregar_ao_sdr", "Coloca o lead no funil do Time de IA, com o Calebe ou a Camila, na etapa Recebido do Josué.", {
+      empresa: str("Nome da empresa."), sdr: { type: "string", enum: ["calebe", "camila"] }, lead_id: str("lead_id da Geração de Leads, se veio de lá."),
+      nota: { type: "number", description: "Nota de 0 a 10 do potencial." }, nicho: str(""), cidade: str(""), bairro: str(""), telefone: str(""), instagram: str(""), site: str(""),
+      falhas: str("O que falta ou está fraco no marketing digital da empresa."), gancho: str("Gancho para o SDR puxar conversa."),
+    }, ["empresa", "sdr"]),
+    F_VER_FUNIL,
+  ],
+  calebe: [
+    F_VER_FUNIL,
+    T("mover_lead", "Muda a etapa de um lead do seu funil.", { lead: str("Nome da empresa ou id."), etapa: { type: "string", enum: ETAPAS }, motivo: str("Obrigatório para descartado."), observacao: str("Opcional: o que aconteceu.") }, ["lead", "etapa"]),
+    T("anotar_no_lead", "Registra uma anotação no histórico do card.", { lead: str("Nome da empresa ou id."), texto: str("A anotação.") }, ["lead", "texto"]),
+    T("atualizar_lead", "Atualiza os dados do contato e do negócio no card. Mande só o que mudou.", {
+      lead: str("Nome da empresa ou id."), contato: str("Nome de quem atende."), cargo_contato: str(""), telefone: str(""), email: str(""), instagram: str(""), site: str(""), bairro: str(""),
+      dor: str("O problema que o lead quer resolver."), decisor: str("Quem decide."), verba: str(""), prazo: str(""), servico_interesse: str(""), objecoes: str(""), observacoes: str(""),
+    }, ["lead"]),
+    T("passar_para_jonathan", "Lead qualificado com reunião marcada: passa para o Jonathan. O Hub cria o negócio no funil dele em Reunião agendada.", {
+      lead: str("Nome da empresa ou id."), reuniao_em: str("Data e hora da reunião no horário de Brasília, formato AAAA-MM-DDTHH:MM."), contato: str("Com quem é a reunião."), resumo: str("O que o lead precisa, dor, decisor, verba e prazo."),
+    }, ["lead", "reuniao_em", "resumo"]),
+  ],
+};
+async function usarFerramenta(agente: string, ferramenta: string, args: unknown): Promise<string> {
+  try {
+    const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const r = await fetch(`${url}/functions/v1/ferramentas`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
+    const t = await r.text();
+    CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada
+    return t.slice(0, 6000) || JSON.stringify({ erro: "sem resposta" });
+  } catch (e) { return JSON.stringify({ erro: "A ferramenta não respondeu: " + String(e).slice(0, 120) }); }
 }
 
 // memória das conversas (tabela escritorio_memoria): vale em qualquer computador
@@ -270,51 +320,68 @@ Deno.serve(async (req) => {
   while (msgs.length && msgs[0].role !== "user") msgs.shift();
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ erro: "sem fala do usuário" }, 400);
 
-  const leads = await leadsDoAgente(String(corpo.agente));
+  const agente = String(corpo.agente);
+  const leads = await leadsDoAgente(agente);
+  const tools = FERRAMENTAS[agente];
   const stream = !!corpo.stream;
-  let r: Response;
-  try {
-   r = await fetch("https://api.anthropic.com/v1/messages", {
+  const system: any[] = [
+    // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
+    { type: "text", text: base + leads, cache_control: { type: "ephemeral" } },
+    { type: "text", text: COMUM(interlocutor, sala, historico, agora, !msgs.some((m) => m.role === "assistant")) },
+  ];
+  const conversa: any[] = msgs.map((m) => ({ ...m }));
+  const chamar = (comFluxo: boolean, ultima: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model: MODELO,
-      max_tokens: 700,
-      thinking: { type: "disabled" },
-      stream,
-      // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
-      system: [
-        { type: "text", text: base + leads, cache_control: { type: "ephemeral" } },
-        { type: "text", text: COMUM(interlocutor, sala, historico, agora, !msgs.some((m) => m.role === "assistant")) },
-      ],
-      messages: msgs,
+      model: MODELO, max_tokens: 900, thinking: { type: "disabled" }, stream: comFluxo, system, messages: conversa,
+      ...(tools ? { tools, tool_choice: ultima ? { type: "none" } : { type: "auto" } } : {}),
     }),
-   });
-  } catch (_e) {
-    return json({ erro: "não consegui falar com a Claude API" }, 502);
-  }
-  if (stream && r.ok && r.body) {
-    // repassa só o texto, pedaço a pedaço, para o escritório já começar a falar
-    const rd = r.body.getReader(), dec = new TextDecoder(), enc = new TextEncoder();
+  });
+  const VOLTAS = 5;
+
+  if (stream) {
+    // repassa só o texto, pedaço a pedaço, para o escritório já começar a falar.
+    // Se o agente usar uma ferramenta do Hub, executa e continua no mesmo fluxo.
+    const enc = new TextEncoder();
     const saida = new ReadableStream({
       async start(ctrl) {
-        let buf = "";
+        let falou = false;
+        const manda = (t: string) => { const x = t.replace(/[*_#`]/g, ""); if (x) { ctrl.enqueue(enc.encode(x)); falou = true; } };
         try {
-          for (;;) {
-            const { value, done } = await rd.read();
-            if (done) break;
-            buf += dec.decode(value, { stream: true });
-            let i;
-            while ((i = buf.indexOf("\n")) >= 0) {
-              const linha = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-              if (!linha.startsWith("data:")) continue;
-              try {
-                const ev = JSON.parse(linha.slice(5).trim());
-                if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
-                  ctrl.enqueue(enc.encode(String(ev.delta.text).replace(/[*_#`]/g, "")));
-                }
-              } catch { /* linha incompleta */ }
+          for (let volta = 0; volta < VOLTAS; volta++) {
+            const r = await chamar(true, volta === VOLTAS - 1);
+            if (!r.ok || !r.body) { if (!falou) manda("Deu um problema aqui, tenta de novo."); break; }
+            const rd = r.body.getReader(), dec = new TextDecoder();
+            const blocos: any[] = []; let parada = ""; let buf = "";
+            for (;;) {
+              const { value, done } = await rd.read();
+              if (done) break;
+              buf += dec.decode(value, { stream: true });
+              let i;
+              while ((i = buf.indexOf("\n")) >= 0) {
+                const linha = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+                if (!linha.startsWith("data:")) continue;
+                let ev: any; try { ev = JSON.parse(linha.slice(5).trim()); } catch { continue; }
+                if (ev.type === "content_block_start") blocos[ev.index] = ev.content_block.type === "tool_use" ? { ...ev.content_block, json: "" } : { type: "text", text: "" };
+                else if (ev.type === "content_block_delta") {
+                  const b = blocos[ev.index];
+                  if (ev.delta?.type === "text_delta") { if (b) b.text += ev.delta.text; manda(ev.delta.text); }
+                  else if (ev.delta?.type === "input_json_delta" && b) b.json += ev.delta.partial_json;
+                } else if (ev.type === "message_delta") parada = ev.delta?.stop_reason || parada;
+              }
             }
+            const usos = blocos.filter((b) => b && b.type === "tool_use");
+            if (parada !== "tool_use" || !usos.length) break;
+            const conteudo = blocos.filter(Boolean).map((b) => b.type === "tool_use"
+              ? { type: "tool_use", id: b.id, name: b.name, input: (() => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } })() }
+              : { type: "text", text: b.text }).filter((b) => b.type === "tool_use" || b.text.trim());
+            conversa.push({ role: "assistant", content: conteudo });
+            const resultados = await Promise.all(conteudo.filter((b: any) => b.type === "tool_use").map(async (b: any) =>
+              ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) })));
+            conversa.push({ role: "user", content: resultados });
+            system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) }; // já falou: não repete o nome
+            if (falou) manda(" ");
           }
         } catch { /* conexão caiu */ }
         ctrl.close();
@@ -322,9 +389,24 @@ Deno.serve(async (req) => {
     });
     return new Response(saida, { headers: { ...h, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) return json({ erro: d?.error?.message || "falha na Claude API", status: r.status }, 502);
-  const texto = (d.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
-    .replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").trim();
+
+  // sem fluxo (testes): mesma lógica, resposta inteira no fim
+  let texto = "", d: any = {};
+  try {
+    for (let volta = 0; volta < VOLTAS; volta++) {
+      const r = await chamar(false, volta === VOLTAS - 1);
+      d = await r.json().catch(() => ({}));
+      if (!r.ok) return json({ erro: d?.error?.message || "falha na Claude API", status: r.status }, 502);
+      texto += " " + (d.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
+      const usos = (d.content || []).filter((c: any) => c.type === "tool_use");
+      if (d.stop_reason !== "tool_use" || !usos.length) break;
+      conversa.push({ role: "assistant", content: d.content });
+      conversa.push({ role: "user", content: await Promise.all(usos.map(async (b: any) => ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) }))) });
+      system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) };
+    }
+  } catch (_e) {
+    return json({ erro: "não consegui falar com a Claude API" }, 502);
+  }
+  texto = texto.replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").replace(/\s+/g, " ").trim();
   return json({ texto, uso: d.usage || null, modelo: d.model || MODELO });
 });
