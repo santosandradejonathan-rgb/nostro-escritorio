@@ -817,6 +817,16 @@ const roomId=(x,z)=>{const r=roomAt(x,z);return r?r.id:null};
 function agentRoom(id){const A=ACT[id];return A?roomId(A.x,A.z):null}
 function agentsHere(){if(!S.room)return[];return S.agents.filter(a=>agentRoom(a.id)===S.room)}
 function peopleTalkingHere(){return Object.values(M.peers).some(p=>p.seen&&p.vol>.5)}
+/* chamar por gíria: "cara", "mano" = um dos homens; "moça", "menina" = uma das mulheres (só no começo ou no fim da frase) */
+const VOC_M=/^(cara|mano|manin|maninho|brother|bro|parceiro|parca|rapaz|moco|veio|vei|irmao|meu amigo|meu chapa|meu querido|campeao|jovem|meu rei)$/;
+const VOC_F=/^(moca|menina|querida|amiga|minha amiga|mulher|garota|dona|minha querida|mocinha|princesa|flor|colega)$/;
+function generoChamado(t){const w=norm(t).replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean);if(!w.length)return null;
+  const pedacos=[w[0],w.slice(0,2).join(' '),w[1],w[w.length-1],w.slice(-2).join(' ')].filter(Boolean);
+  if(w[0]==='o'||w[0]==='oi'||w[0]==='e'||w[0]==='ei'||w[0]==='opa'||w[0]==='fala'){pedacos.push(w[1]||'',w.slice(1,3).join(' '))}
+  for(const x of pedacos){if(VOC_M.test(x))return 'm';if(VOC_F.test(x))return 'f'}return null}
+function agentePorGenero(g){const here=agentsHere().filter(a=>a.genero===g);if(!here.length)return null;
+  if(V.last&&here.some(a=>a.id===V.last)&&Date.now()-V.lastAt<10*60000)return V.last;
+  let id=null,bd=1e9;for(const a of here){const A=ACT[a.id];const d=Math.hypot(A.x-ME.x,A.z-ME.z);if(d<bd){bd=d;id=a.id}}return id}
 /* gente de verdade na mesma sala: aí os agentes só falam quando chamados pelo nome */
 function humanosNaSala(){if(!S.room)return 0;return Object.values(M.peers).filter(p=>p.seen&&p.room===S.room).length}
 const SO_ESCUTA=/(so (escuta|ouve|ouvindo|escutando)|fica (quieto|quieta|na escuta|so ouvindo)|silencio|fica em silencio|nao (fala|responde) (agora|nada)|deixa eu conversar|espera a gente)/;
@@ -834,6 +844,7 @@ function onHeard(text){
     else{setSay(first(a.nome)+' está vindo…');agentComes(named,()=>startVoice(named,text))}
     return}
   if(peopleTalkingHere()||humanosNaSala())return; // com gente na sala, só responde quem for chamado pelo nome
+  const g=generoChamado(text);if(g){const pg=agentePorGenero(g);if(pg){startVoice(pg,text);return}}
   const here=agentsHere();if(!here.length)return;
   let id=V.last&&here.some(a=>a.id===V.last)&&Date.now()-V.lastAt<10*60000?V.last:null;
   if(!id){let bd=1e9;for(const a of here){const A=ACT[a.id];const d=Math.hypot(A.x-ME.x,A.z-ME.z);if(d<bd){bd=d;id=a.id}}}
@@ -909,6 +920,7 @@ function userSays(text){const id=V.agent;if(!id||!V.sess)return;text=String(text
   // com outra pessoa na sala (ou no modo só escuta), frase sem o nome do agente é conversa entre vocês: ele não entra
   if(!nomeado&&(V.soEscuta||humanosNaSala()||humanIn(text))){V.userAt=Date.now();V.lastAt=Date.now();if(humanIn(text))callHuman(humanIn(text));return}
   if(chamado&&V.soEscuta){V.soEscuta=false;setSay('')}
+  if(!nomeado&&!humanosNaSala()){const g=generoChamado(text),eu=agentById(id);if(g&&eu&&eu.genero!==g){const outro=agentePorGenero(g);if(outro&&outro!==id){endVoice(true);startVoice(outro,text);return}}}
   if(V.falando||V.pensando)interromper();
   V.userAt=Date.now();V.lastAt=Date.now();S.talkAt=Date.now();showBubble(ME,text,4000,true);memAdd(id,'u',text);
   const hu=humanIn(text);if(hu)callHuman(hu);
@@ -1186,7 +1198,7 @@ async function startMulti(){
     addEventListener('beforeunload',()=>{try{ch.untrack();sb.removeChannel(ch)}catch(e){}});
   }catch(e){console.warn('multi',e)}}
 
-window.__nostro={get V(){return V},get M(){return M},get S(){return S},get ME(){return ME},ACT,onHeard,startVoice,endVoice,querCortar,interromper};
+window.__nostro={get V(){return V},get M(){return M},get S(){return S},get ME(){return ME},ACT,onHeard,startVoice,endVoice,querCortar,interromper,generoChamado};
 const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('tempo')),ms))]);
 async function enterOffice(){
   if($('enter').disabled)return;const nm=($('myname').value||'').trim().replace(/\s+/g,' ');if(!nm){$('myname').focus();toast('Escreva seu nome para o time saber quem chegou.');return}
