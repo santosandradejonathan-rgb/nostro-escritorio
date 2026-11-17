@@ -187,9 +187,9 @@ export function consultaOverpass(termo, centro) {
 async function buscarOSM(termo, centro) {
   const q = consultaOverpass(termo, centro);
   if (!q) return [];
-  for (const host of ['https://overpass-api.de/api/interpreter']) {   // um servidor só, para a busca não demorar
+  for (const host of ['https://overpass-api.de/api/interpreter']) {
     try {
-      const r = await comPrazo(host, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA_OSM }, body: 'data=' + encodeURIComponent(q) }, 11000);
+      const r = await comPrazo(host, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA_OSM }, body: 'data=' + encodeURIComponent(q) }, 9000);
       if (!r.ok) continue;
       const j = await r.json();
       return (j.elements || []).map(normalizarOSM).filter(Boolean);

@@ -65,6 +65,18 @@ async function achaCidade(local: string, env: any): Promise<any> {
   } catch (_e) { return null; }
 }
 
+async function buscaPeloHub(termo: string, local: string): Promise<any> {
+  try {
+    const passe = crypto.randomUUID() + crypto.randomUUID();
+    const g = await db("agente_tokens", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ token: passe }) });
+    if (!g.ok) return null;
+    const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 30000);
+    const r = await fetch("https://nostrohub.com.br/api/leads/buscar-agente", { method: "POST", signal: ac.signal, headers: { "Content-Type": "application/json", "x-agente-token": passe }, body: JSON.stringify({ termo, local }) });
+    clearTimeout(t);
+    return await r.json().catch(() => null);
+  } catch (_e) { return null; }
+}
+
 /* ---------- Josué: Geração de Leads ---------- */
 async function buscarEmpresas(a: any) {
   const termo = curto(a.nicho, 120), local = curto(a.local || "Montes Claros, MG", 160);
@@ -76,14 +88,20 @@ async function buscarEmpresas(a: any) {
   const uso = await (await db(`pulse_leads_uso?mes=eq.${mes}&select=usadas`)).json().catch(() => []);
   const usadas = (uso[0] && uso[0].usadas) || 0;
   if (usadas + 1 > limite) return { erro: `O limite de buscas do mês acabou (${usadas} de ${limite}).` };
-  const env = { TOMTOM_KEY: Deno.env.get("TOMTOM_KEY") || "" };
-  const centro = await achaCidade(local, env);
-  if (!centro) return { erro: `Não consegui localizar "${local}". Fale a cidade e o estado, por exemplo Montes Claros, MG.` };
+  // a mesma busca do gerador de leads do Hub (TomTom + OpenStreetMap); se o Hub não responder, busca daqui
+  let centro: any = null, tt: any = { lugares: [] }, osm: any[] = [];
+  const hub = await buscaPeloHub(termo, local);
+  if (hub && hub.centro) { centro = hub.centro; tt = { lugares: hub.tomtom || [] }; osm = hub.osm || []; }
+  else {
+    const env = { TOMTOM_KEY: Deno.env.get("TOMTOM_KEY") || "" };
+    centro = await achaCidade(local, env);
+    if (!centro) return { erro: (hub && hub.erro) || `Não consegui localizar "${local}". Fale a cidade e o estado, por exemplo Montes Claros, MG.` };
+    [tt, osm] = await Promise.all([
+      env.TOMTOM_KEY ? buscarTomTom(termo, centro, 50, env) : Promise.resolve({ lugares: [], erro: "" }),
+      buscarOSM(termo, centro),
+    ]);
+  }
   await db("pulse_leads_uso", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ mes, usadas: usadas + 1, updated_at: new Date().toISOString() }) });
-  const [tt, osm] = await Promise.all([
-    env.TOMTOM_KEY ? buscarTomTom(termo, centro, 50, env) : Promise.resolve({ lugares: [], erro: "" }),
-    buscarOSM(termo, centro),
-  ]);
   let lugares = juntarFontes([tt.lugares, osm]);
   const cidade = local.split(",")[0].trim();
   lugares.forEach((l: any) => {
