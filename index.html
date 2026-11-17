@@ -970,15 +970,24 @@ function onRoomChange(prev,now){
   for(const a of S.agents){const A=ACT[a.id];if(A&&(A.coming||A.came)&&A.calledBy!==now)sendHome(a.id)}}
 /* ouvir o tempo todo. Você terminou de falar quando fica ~0,9 s em silêncio (não espera o navegador fechar a frase).
    Enquanto o agente fala, o que o microfone pega só serve para cortar a fala dele. */
-function ouviu(t){if(Date.now()<(V.mudoAte||0))return;
+const FALA_ABERTA=/(^|\s)(e|que|pra|para|de|do|da|dos|das|com|mas|porque|entao|tipo|o|a|os|as|um|uma|se|quando|como|no|na|em|ou|ai|tambem|sobre|onde|qual|quem|mais|tipo assim|assim|eh|hum|ahn)\s*[,.]?$/;
+function ouviu(t){if(Date.now()<(V.mudoAte||0))return;if(V.agent)setSay('');
   if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Calebe, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}
 function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
   if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;const feitos=new Set();
+  // Junta tudo o que você fala numa fala só e só manda quando você realmente terminou:
+  // 1,4 s de silêncio, ou 2,4 s se a frase parou num "e", "que", "pra"... (sinal de que você ainda vai continuar).
+  let buf='',parc='',parcIdx=-1;
+  const manda=()=>{clearTimeout(V.silT);if(V.falando)return;if(parcIdx>=0)feitos.add(parcIdx);
+    const tudo=(buf+' '+parc).replace(/\s+/g,' ').trim();buf='';parc='';parcIdx=-1;if(tudo.length>=2)ouviu(tudo)};
   r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const res=ev.results[i],t=res[0].transcript.trim();if(t.length<2)continue;
-    if(V.falando){if(querCortar(t))interromper();else{clearTimeout(V.silT);continue}}
+    if(V.falando){if(querCortar(t)){interromper();buf='';parc=''}else{if(res.isFinal)feitos.add(i);clearTimeout(V.silT);continue}}
     if(feitos.has(i))continue;
-    if(res.isFinal){clearTimeout(V.silT);feitos.add(i);ouviu(t);continue}
-    clearTimeout(V.silT);V.silT=setTimeout(()=>{if(feitos.has(i)||V.falando)return;feitos.add(i);ouviu(t)},900)}};
+    if(res.isFinal){feitos.add(i);buf+=' '+t;if(parcIdx===i){parc='';parcIdx=-1}}
+    else{parc=t;parcIdx=i}}
+    const agora=(buf+' '+parc).replace(/\s+/g,' ').trim();if(!agora)return;
+    if(V.agent)setSay('Você: '+agora);
+    clearTimeout(V.silT);V.silT=setTimeout(manda,FALA_ABERTA.test(norm(agora))?2400:1400)};
   r.onend=()=>{clearTimeout(V.silT);V.rec=null;if(V.recWanted)setTimeout(startNameListening,250)};
   r.onerror=e=>{if(e.error==='not-allowed'){V.recWanted=false;setSay('Permita o microfone para conversar com o time.')}};
   try{r.start()}catch(e){V.rec=null}}

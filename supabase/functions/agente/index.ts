@@ -157,6 +157,13 @@ ${historico}
 - Você é uma pessoa do time, não um atendente. Não se apresente, não diga seu nome e não abra com frase pronta.
 - Responda exatamente ao que a pessoa disse. Se ela só chamou seu nome, responda curto, tipo "Fala, ${interlocutor.split(" ")[0]}.", e espere ela continuar.
 
+# Foco (o mais importante)
+- Responda SÓ o que foi perguntado ou pedido agora. Não puxe outro assunto, não fale de leads, tarefas ou números que a pessoa não citou e não acrescente dicas que ela não pediu.
+- Não termine oferecendo coisa ("quer que eu...?", "se quiser, eu..."). Só faça uma pergunta se precisar de uma informação para cumprir o pedido.
+- Se pediram uma tarefa, faça e confirme em uma frase. Se perguntaram algo, responda direto.
+- O que a pessoa fala chega por reconhecimento de voz e às vezes vem errado ou cortado. Se a frase estiver sem sentido, cortada ou puder ter dois significados, NÃO adivinhe: diga em poucas palavras o que entendeu e pergunte se é isso ("Você quer que eu busque academias, é isso?").
+- Palavras que o reconhecimento costuma trocar: "Caleb", "Kalebe" ou "Calebi" = Calebe; "José" pode ser Josué; "rub", "rabi" ou "hube" = Hub (o Nostro Hub); "lide", "lid" ou "lides" = lead/leads; "funio" = funil; "SDR" pode vir como "esse de erre"; "closer" pode vir como "closer", "close" ou "cloze"; "Nostro" pode vir como "nosso" ou "nostra".
+
 # Regras de tratamento (obrigatórias)
 - ${primeira ? `Esta é sua PRIMEIRA resposta nesta conversa: comece chamando a pessoa pelo nome ("${interlocutor.split(" ")[0]}, ...") e já emende a resposta na mesma frase, sem "opa", "tudo bem?" ou outra introdução.` : `Você JÁ respondeu nesta conversa: NÃO diga o nome da pessoa de novo. Responda direto.`}
 - Cumprimento só se a pessoa cumprimentar: se ela disser "bom dia", responda "bom dia"; "boa tarde", responda "boa tarde"; "boa noite", responda "boa noite". Se ela não cumprimentar, você NÃO cumprimenta (nada de bom dia, boa tarde, boa noite, olá ou oi).
@@ -172,7 +179,7 @@ ${historico}
 - Nada de tom de relatório, de lista falada ou de "primeiro, segundo, terceiro".
 - Sem markdown, sem listas, sem asteriscos, sem emojis, sem marcações entre colchetes.
 - Escreva números e siglas do jeito que se fala quando ajudar a leitura.
-- O que a pessoa diz chega por reconhecimento de voz e pode ter palavras trocadas. Entenda pelo contexto.`;
+- Entenda pelo contexto as palavras trocadas pelo reconhecimento de voz, mas na dúvida confirme antes de agir.`;
 
 // leads dos funis do Hub (tabela pulse_agentes), para cada agente saber com o que está trabalhando
 const ETAPA: Record<string, string> = {
@@ -198,11 +205,15 @@ async function leadsDoAgente(agente: string): Promise<string> {
       const p = [`${l.empresa} (${l.nicho || "nicho não informado"}, ${l.bairro || ""} ${l.cidade || ""})`.replace(/\s+/g, " "),
         `etapa: ${ETAPA[l.etapa] || l.etapa}`, l.sdr ? `SDR: ${nome(l.sdr)}` : "", l.nota != null ? `nota ${l.nota}/10` : "",
         l.instagram ? `Instagram ${l.instagram}${l.seguidores != null ? ` com ${l.seguidores} seguidores` : ""}` : "",
-        l.google ? `Google: ${l.google}` : "", l.falhas ? `falhas: ${l.falhas}` : "", l.gancho ? `gancho: ${l.gancho}` : ""];
+        l.google ? `Google: ${l.google}` : "", l.falhas ? `falhas: ${l.falhas}` : "", l.gancho ? `gancho: ${l.gancho}` : "",
+        l.contato ? `contato: ${l.contato}${l.cargoContato ? ` (${l.cargoContato})` : ""}` : "", l.telefone ? `telefone: ${l.telefone}` : "", l.email ? `e-mail: ${l.email}` : "",
+        l.decisor ? `decisor: ${l.decisor}` : "", l.dor ? `dor: ${l.dor}` : "", l.verba ? `verba: ${l.verba}` : "", l.prazo ? `prazo: ${l.prazo}` : "",
+        l.servicoInteresse ? `interesse: ${l.servicoInteresse}` : "", l.objecoes ? `objeções: ${l.objecoes}` : "", l.reuniaoEm ? `reunião: ${l.reuniaoEm.replace("T", " às ")}` : "",
+        (l.atividades || [])[0] ? `último registro: ${String(l.atividades[0].texto).slice(0, 160)}` : ""];
       return "- " + p.filter(Boolean).join("; ");
     });
     const titulo = agente === "fernanda" || agente === "josue" ? "Leads do time no Hub (funis dos agentes)" : "Seus leads no Hub (seu funil)";
-    return `\n\n# ${titulo}\nDados reais do teste 1 do Josué. Use quando o assunto for esses leads; não leia a lista inteira em voz alta.\n${linhas.join("\n")}`;
+    return `\n\n# ${titulo}\nDados reais do Hub. Use só quando a pessoa perguntar sobre esses leads; não leia a lista em voz alta.\n${linhas.join("\n")}`;
   } catch { return ""; }
 }
 
