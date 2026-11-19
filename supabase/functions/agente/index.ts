@@ -44,6 +44,7 @@ Simpático, jeito mineiro de conversar, analítico quando o assunto é lead. Tom
 - Quando pedirem uma tarefa (buscar, analisar, colocar no funil, mover, anotar, atualizar, passar), use as ferramentas de verdade. Antes, diga só uma frase curta ("Deixa eu puxar aqui."). Depois conte o resultado em 1 ou 2 frases, com os números principais e no máximo 3 nomes. Não leia listas em voz alta: tudo fica salvo no Hub.
 - Quando falarem de lista, contatos, empresas ou leads do Hub, CONSULTE com a ferramenta (ver_leads_gerados ou ver_funil) antes de responder. Nunca diga que não encontrou ou que não tem acesso sem ter consultado.
 - Para analisar várias empresas, chame a análise de várias de uma vez (até 5 por vez).
+- Em tarefa com várias etapas (analisar uma lista, vários lotes), NÃO narre cada etapa. Fale só uma frase curta no começo e, no fim, o resultado em no máximo 3 frases: quantas analisou, quantas colocou no funil e as 2 ou 3 melhores com o motivo.
 - Antes de passar para o Jonathan, tenha a data e a hora da reunião e um resumo. Se faltar a data ou a hora, pergunte.
 - Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
 - Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
@@ -268,7 +269,9 @@ Deno.serve(async (req) => {
             const r = await chamar(true, volta === VOLTAS - 1);
             if (!r.ok || !r.body) { if (!falou) manda("Deu um problema aqui, tenta de novo."); break; }
             const rd = r.body.getReader(), dec = new TextDecoder();
-            const blocos: any[] = []; let parada = ""; let buf = "";
+            const blocos: any[] = []; let parada = ""; let buf = "", guardado = "";
+            // na 1ª volta a fala sai na hora; nas seguintes só sai se for a resposta final (o que vem entre ferramentas é descartado)
+            const fala = (t: string) => { if (volta === 0) manda(t); else guardado += t; };
             for (;;) {
               const { value, done } = await rd.read();
               if (done) break;
@@ -281,13 +284,13 @@ Deno.serve(async (req) => {
                 if (ev.type === "content_block_start") blocos[ev.index] = ev.content_block.type === "tool_use" ? { ...ev.content_block, json: "" } : { type: "text", text: "" };
                 else if (ev.type === "content_block_delta") {
                   const b = blocos[ev.index];
-                  if (ev.delta?.type === "text_delta") { if (b) b.text += ev.delta.text; manda(ev.delta.text); }
+                  if (ev.delta?.type === "text_delta") { if (b) b.text += ev.delta.text; fala(ev.delta.text); }
                   else if (ev.delta?.type === "input_json_delta" && b) b.json += ev.delta.partial_json;
                 } else if (ev.type === "message_delta") parada = ev.delta?.stop_reason || parada;
               }
             }
             const usos = blocos.filter((b) => b && b.type === "tool_use");
-            if (parada !== "tool_use" || !usos.length) break;
+            if (parada !== "tool_use" || !usos.length) { if (guardado) manda(guardado); break; }
             const conteudo = blocos.filter(Boolean).map((b) => b.type === "tool_use"
               ? { type: "tool_use", id: b.id, name: b.name, input: (() => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } })() }
               : { type: "text", text: b.text }).filter((b) => b.type === "tool_use" || b.text.trim());
@@ -312,9 +315,10 @@ Deno.serve(async (req) => {
       const r = await chamar(false, volta === VOLTAS - 1);
       d = await r.json().catch(() => ({}));
       if (!r.ok) return json({ erro: d?.error?.message || "falha na Claude API", status: r.status }, 502);
-      texto += " " + (d.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
+      const t = (d.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
+      if (volta === 0) texto += " " + t;
       const usos = (d.content || []).filter((c: any) => c.type === "tool_use");
-      if (d.stop_reason !== "tool_use" || !usos.length) break;
+      if (d.stop_reason !== "tool_use" || !usos.length) { if (volta > 0) texto += " " + t; break; }
       conversa.push({ role: "assistant", content: d.content });
       conversa.push({ role: "user", content: await Promise.all(usos.map(async (b: any) => ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) }))) });
       system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) };
