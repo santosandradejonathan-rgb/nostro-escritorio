@@ -827,7 +827,8 @@ function bubbleSprite(text,mine){const c=document.createElement('canvas');const 
   const g2=c.getContext('2d');g2.fillStyle=mine?'#C9A45C':'rgba(255,255,255,.96)';rr(g2,0,0,c.width,h,26);g2.fill();g2.beginPath();g2.moveTo(c.width/2-14,h-1);g2.lineTo(c.width/2,h+20);g2.lineTo(c.width/2+14,h-1);g2.fill();
   g2.font=`600 ${fz}px Manrope`;g2.fillStyle=mine?'#17130B':'#1d1a16';g2.textBaseline='top';lines.forEach((l,i)=>g2.fillText(l,28,22+i*lh));
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));sp.renderOrder=13;const sw=Math.min(2.6,c.width/230);sp.scale.set(sw,sw*c.height/c.width,1);sp.center.set(.5,0);return sp}
-function showBubble(actor,text,ms,mine){if(actor.bubble){actor.p.root.remove(actor.bubble);clearTimeout(actor.bubbleT)}const b=bubbleSprite(text,mine);b.position.y=2.75;actor.p.root.add(b);actor.bubble=b;
+const BALOES=false; // balões de fala em cima dos bonecos: desligados a pedido do Jonathan
+function showBubble(actor,text,ms,mine){if(!BALOES){if(actor&&actor.bubble){actor.p.root.remove(actor.bubble);actor.bubble=null}return}if(actor.bubble){actor.p.root.remove(actor.bubble);clearTimeout(actor.bubbleT)}const b=bubbleSprite(text,mine);b.position.y=2.75;actor.p.root.add(b);actor.bubble=b;
   if(ms)actor.bubbleT=setTimeout(()=>{if(actor.bubble===b){actor.p.root.remove(b);actor.bubble=null}},ms)}
 function setSay(t){$('say').textContent=t||''}
 const APELIDOS={josue:['josue','jose','joshua','josue carvalho'],calebe:['johnny','calebe','caleb','kalebe','galeb','calebi','jhonny','johny','jonny','jhony','joni','jony','jone','joney','jonhy','djony','dijoni','jhoni','johnnie','johnie'],camila:['camila','camilla','kamila','camilinha'],fernanda:['fernanda','fernandinha','nanda']};
