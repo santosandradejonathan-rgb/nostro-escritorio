@@ -176,7 +176,7 @@ button{cursor:pointer}
       <div class="viewbar"><label for="roomView">Ver sala<select id="roomView"><option value="">Seguindo você</option></select></label><button class="back" type="button" id="backToMe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>Voltar para mim</button></div>
       <div class="talk" id="talk"><div class="say" id="say" aria-live="polite"></div></div>
       <div class="selfwrap" id="selfwrap"><video id="selfview" muted playsinline autoplay></video><span>Você</span></div>
-      <div class="hud"><div class="k">Entre numa sala e fale normalmente. Para chamar alguém de outra sala, diga o nome. Ande com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou clicando; dois dedos movem a visão.</div></div>
+      <div class="hud"><div class="k"><b>Segure a barra de <kbd>espaço</kbd> enquanto fala</b> e solte quando terminar: é o jeito mais preciso. Também dá para falar à vontade e chamar pelo nome. Ande com <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> ou clicando; dois dedos movem a visão.</div></div>
       <div class="edittools" id="edittools" role="toolbar" aria-label="Arrumar móveis"><span id="editHint">Clique numa cadeira ou notebook</span>
         <button type="button" id="rotL" disabled>↺ Girar</button><button type="button" id="rotR" disabled>Girar ↻</button><button type="button" id="rot180" disabled>Virar</button><button type="button" id="resetObj" disabled>Original</button><button type="button" class="done" id="editDone">Concluir</button></div>
       <div class="ctrl">
@@ -830,7 +830,7 @@ function bubbleSprite(text,mine){const c=document.createElement('canvas');const 
 function showBubble(actor,text,ms,mine){if(actor.bubble){actor.p.root.remove(actor.bubble);clearTimeout(actor.bubbleT)}const b=bubbleSprite(text,mine);b.position.y=2.75;actor.p.root.add(b);actor.bubble=b;
   if(ms)actor.bubbleT=setTimeout(()=>{if(actor.bubble===b){actor.p.root.remove(b);actor.bubble=null}},ms)}
 function setSay(t){$('say').textContent=t||''}
-const APELIDOS={josue:['josue','jose','joshua','josue carvalho'],calebe:['johnny','jhonny','johny','jonny','jhony','joni','jony','jone','joney','jonhy','djony','dijoni','jhoni','johnnie','johnie'],camila:['camila','camilla','kamila','camilinha'],fernanda:['fernanda','fernandinha','nanda']};
+const APELIDOS={josue:['josue','jose','joshua','josue carvalho'],calebe:['johnny','calebe','caleb','kalebe','galeb','calebi','jhonny','johny','jonny','jhony','joni','jony','jone','joney','jonhy','djony','dijoni','jhoni','johnnie','johnie'],camila:['camila','camilla','kamila','camilinha'],fernanda:['fernanda','fernandinha','nanda']};
 function nameIn(text){const n=norm(text);for(const a of S.agents){const lista=(APELIDOS[a.id]||[]).concat([norm(first(a.nome))]);for(const f of lista){if(f&&new RegExp('(^|[^a-z])'+f+'([^a-z]|$)').test(n))return a.id}}return null}
 const V={agent:null,sess:null,mode:null,starting:false,rec:null,recWanted:false,entered:false,last:null,lastAt:0,userAt:0,gen:0,falando:false,pensando:false,mudoAte:0,ctl:null};
 /* memória de cada agente: o que já foi conversado fica guardado neste navegador */
@@ -1009,7 +1009,10 @@ const FALA_ABERTA=/(^|\s)(e|que|pra|para|de|do|da|dos|das|com|mas|porque|entao|t
 function ecoAtrasado(t){if(!V.agent||!V.fimFala||!V.falaTexto)return false;const dt=Date.now()-V.fimFala;if(dt>9000)return false;
   const w=norm(t).split(/[^a-z0-9]+/).filter(x=>x.length>2);if(!w.length)return dt<4000;
   if(w.length<=2)return dt<6000&&ehEco(t)>=.99;return ehEco(t)>=.7}
-function ouviu(t){if(Date.now()<(V.mudoAte||0))return;if(ecoAtrasado(t)){if(V.agent)setSay('');return}if(V.agent)setSay('');
+function ouviu(t){const viaPtt=V.viaPtt;V.viaPtt=false;
+  if(!viaPtt){if(Date.now()<(V.mudoAte||0))return;if(ecoAtrasado(t)){if(V.agent)setSay('');return}}
+  if(viaPtt&&!V.agent&&!nameIn(t)&&AGENTS[0])t=first(AGENTS[0].nome)+', '+t;
+  if(V.agent)setSay('');
   if(V.agent)userSays(t);else{onHeard(t);if(!V.agent){setSay('Ouvi: “'+t+'”. Chame pelo nome, por exemplo: Johnny, tudo bem?');clearTimeout(V.sayT);V.sayT=setTimeout(()=>{if(!V.agent)setSay('')},4500)}}}
 function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
   if(V.rec)return;const r=new SR();r.lang='pt-BR';r.continuous=true;r.interimResults=true;V.rec=r;const feitos=new Set();
@@ -1018,12 +1021,14 @@ function startNameListening(){V.recWanted=true;if(!V.entered)return;const SR=win
   let buf='',parc='',parcIdx=-1;
   const manda=()=>{clearTimeout(V.silT);if(V.falando)return;if(parcIdx>=0)feitos.add(parcIdx);
     const tudo=(buf+' '+parc).replace(/\s+/g,' ').trim();buf='';parc='';parcIdx=-1;if(tudo.length>=2)ouviu(tudo)};
+  V.pttLimpa=()=>{buf='';parc='';parcIdx=-1;clearTimeout(V.silT)};V.pttManda=manda;
   r.onresult=ev=>{for(let i=ev.resultIndex;i<ev.results.length;i++){const res=ev.results[i],t=res[0].transcript.trim();if(t.length<2)continue;
-    if(V.falando){if(querCortar(t)){interromper();buf='';parc=''}else{if(res.isFinal)feitos.add(i);clearTimeout(V.silT);continue}}
+    if(V.falando&&!V.ptt){if(querCortar(t)){interromper();buf='';parc=''}else{if(res.isFinal)feitos.add(i);clearTimeout(V.silT);continue}}
     if(feitos.has(i))continue;
     if(res.isFinal){feitos.add(i);buf+=' '+t;if(parcIdx===i){parc='';parcIdx=-1}}
     else{parc=t;parcIdx=i}}
     const agora=(buf+' '+parc).replace(/\s+/g,' ').trim();if(!agora)return;
+    if(V.ptt){setSay('🎙 '+agora);return}   // segurando o espaço: só manda quando soltar
     if(V.agent)setSay('Você: '+agora);
     clearTimeout(V.silT);V.silT=setTimeout(manda,FALA_ABERTA.test(norm(agora))?2400:1400)};
   r.onend=()=>{clearTimeout(V.silT);V.rec=null;if(V.recWanted)setTimeout(startNameListening,250)};
@@ -1052,11 +1057,18 @@ function walkToAgent(id){const A=ACT[id];if(!A)return;S.dismissed=null;setFree(f
   else{const dx=ME.x-A.x,dz=ME.z-A.z,d=Math.hypot(dx,dz)||1;walkTo(A.x+dx/d*1,A.z+dz/d*1)}}
 const typing=()=>{const el=document.activeElement;return el&&(el.tagName==='TEXTAREA'||el.tagName==='INPUT'||el.tagName==='SELECT')};
 const KEYS={ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,w:1,a:1,s:1,d:1};
+// Segurar a barra de espaço = falar. Enquanto segura, o agente para de falar e escuta tudo;
+// ao soltar, a frase inteira vai de uma vez. Sem eco e sem frase cortada.
+function pttInicio(){if(V.ptt||!V.entered)return;V.ptt=true;if(V.falando||V.pensando)interromper();V.pttLimpa&&V.pttLimpa();V.mudoAte=0;
+  if(!V.rec)startNameListening();document.body.classList.add('ptt');setSay('🎙 Pode falar… solte o espaço quando terminar')}
+function pttFim(){if(!V.ptt)return;V.ptt=false;document.body.classList.remove('ptt');setSay('Enviando…');
+  setTimeout(()=>{V.viaPtt=true;V.pttManda&&V.pttManda();setTimeout(()=>{V.viaPtt=false},50)},650)}
 document.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!typing()){e.preventDefault();if(!e.repeat)pttInicio();return}
   if(e.key==='Escape'){if(V.falando||V.pensando){interromper();return}document.activeElement&&document.activeElement.blur();return}
   if(typing())return;if(S.edit&&S.sel&&(e.key==='r'||e.key==='R')){rotateSel(e.shiftKey?-Math.PI/4:Math.PI/4);return}if(S.edit&&e.key==='Escape'){setEdit(false);return}const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k]){audio();S.keys[k]=true;e.preventDefault()}
 });
-document.addEventListener('keyup',e=>{const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k])S.keys[k]=false});
+document.addEventListener('keyup',e=>{if(e.code==='Space'&&V.ptt){e.preventDefault();pttFim();return}const k=e.key.length===1?e.key.toLowerCase():e.key;if(KEYS[k])S.keys[k]=false});
 window.addEventListener('blur',()=>{S.keys={}});
 function floorPoint(cx,cy){const r=renderer.domElement.getBoundingClientRect();ptr.set(((cx-r.left)/r.width)*2-1,-((cy-r.top)/r.height)*2+1);raycaster.setFromCamera(ptr,camera);const p=raycaster.intersectObject(floorPlane,false)[0];return p?p.point:null}
 let drag=null;let selBox=null;const dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);const hitP=new THREE.Vector3();
