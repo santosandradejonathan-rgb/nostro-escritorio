@@ -1,8 +1,9 @@
 // Ferramentas do Time de IA no Nostro Hub.
 // Só a função "agente" chama esta (com a chave de serviço do próprio projeto). Cada agente só usa as suas.
-// Hoje o Johnny (id interno "calebe") faz tudo: Geração de Leads (buscar, analisar site, CNPJ), coloca no próprio funil, mexe nele e passa a reunião para o Jonathan.
+// Hoje o Johnny (id interno "calebe") faz tudo: Geração de Leads (buscar, analisar site, CNPJ, triagem da lista toda), coloca no próprio funil, mexe nele e passa a reunião para o Jonathan.
 // O funil do Jonathan não é mexido aqui: a passagem fica marcada e o Hub cria o negócio quando abre.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+declare const EdgeRuntime: any;
 import { geocodificar, buscarOSM, buscarTomTom, juntarFontes, telefoneBR, analisarSite, consultarCnpj } from "./leads.js";
 
 const URL_SB = Deno.env.get("SUPABASE_URL") || "";
@@ -10,7 +11,7 @@ const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PERMISSOES: Record<string, string[]> = {
   josue: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "entregar_ao_sdr", "ver_funil"],
   // o Johnny hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
-  calebe: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "adicionar_ao_funil", "ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
+  calebe: ["triagem_lista", "ver_tarefa", "buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "adicionar_ao_funil", "ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
 };
 const ETAPAS_SDR = ["novo", "abordado", "followup", "respondeu", "qualificando", "qualificado"];
 const NOME_ETAPA: Record<string, string> = {
@@ -128,10 +129,83 @@ async function buscarEmpresas(a: any) {
 }
 async function verLeadsGerados(a: any) {
   const q = sem(a.filtro || "");
-  const r = await db("pulse_leads?select=id,status,data,criado_em&order=criado_em.desc&limit=300");
+  const r = await db("pulse_leads?select=id,status,data,criado_em&order=criado_em.desc&limit=1000");
   const lista = ((await r.json().catch(() => [])) as any[]).filter((x) => !x.data?.expirado);
   const f = q ? lista.filter((x) => sem(`${x.data?.nome} ${x.data?.categoria} ${x.data?.cidade}`).includes(q)) : lista;
-  return { total: f.length, leads: f.slice(0, 25).map((x) => ({ lead_id: x.id, nome: x.data?.nome, categoria: x.data?.categoria, cidade: x.data?.cidade, telefone: x.data?.telefone || "", site: x.data?.site || "", instagram: x.data?.instagram || x.data?.siteInfo?.instagram?.[0] || "", ja_analisado: !!x.data?.siteInfo, no_funil: !!x.data?.timeIA, status: x.status })) };
+  const pag = Math.max(1, Math.round(+a.pagina || 1)), ini = (pag - 1) * 25;
+  return {
+    total: f.length, pagina: pag, paginas: Math.ceil(f.length / 25),
+    com_site: f.filter((x) => x.data?.site).length, com_celular: f.filter((x) => celularBR(x.data?.telefone || x.data?.telefoneIntl)).length,
+    ja_no_funil: f.filter((x) => x.data?.timeIA).length, ja_triados: f.filter((x) => x.data?.triagem).length,
+    leads: f.slice(ini, ini + 25).map((x) => ({ lead_id: x.id, nome: x.data?.nome, categoria: x.data?.categoria, cidade: x.data?.cidade, telefone: x.data?.telefone || "", celular: celularBR(x.data?.telefone || x.data?.telefoneIntl), site: x.data?.site || "", instagram: x.data?.instagram || x.data?.siteInfo?.instagram?.[0] || "", ja_analisado: !!x.data?.siteInfo, no_funil: !!x.data?.timeIA })),
+  };
+}
+// celular brasileiro (DDD + 9 + 8 dígitos): quase sempre tem WhatsApp
+function celularBR(tel: unknown) { const d = String(tel || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""); return /^\d{2}9\d{8}$/.test(d); }
+
+/* ---------- triagem da lista inteira, em segundo plano ---------- */
+// Regra do Jonathan: só fica de fora quem não tem WhatsApp; sem site é potencial (dá para vender site).
+async function triagemLista(agente: string, a: any) {
+  const r = await db("pulse_leads?select=id,data&order=criado_em.desc&limit=1000");
+  const q = sem(a.filtro || "");
+  const lista = ((await r.json().catch(() => [])) as any[])
+    .filter((x) => !x.data?.expirado && !x.data?.timeIA && !x.data?.triagem)
+    .filter((x) => !q || sem(`${x.data?.nome} ${x.data?.categoria} ${x.data?.cidade}`).includes(q));
+  if (!lista.length) return { erro: "Não sobrou ninguém para analisar: todos os leads da Geração já estão no funil ou já foram triados." };
+  const id = "tri-" + Date.now().toString(36);
+  await db("agente_tarefas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id, agente, tipo: "triagem", total: lista.length }) });
+  const job = processarTriagem(id, agente, lista).catch(async (e) => {
+    await db(`agente_tarefas?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status: "erro", resumo: { erro: String(e).slice(0, 200) }, atualizado_em: new Date().toISOString() }) });
+  });
+  try { EdgeRuntime.waitUntil(job); } catch { /* fora do Supabase: segue sem esperar */ }
+  return { ok: true, tarefa: id, total: lista.length, obs: "Começou em segundo plano. Leva de 1 a 3 minutos. Quem tiver WhatsApp entra no funil; quem não tiver fica de fora." };
+}
+async function processarTriagem(id: string, agente: string, lista: any[]) {
+  let feitos = 0, adicionados = 0, descartados = 0;
+  const entraram: any[] = [];
+  const atualiza = (fim = false) => db(`agente_tarefas?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({
+    feitos, adicionados, descartados, atualizado_em: new Date().toISOString(),
+    ...(fim ? { status: "concluida", resumo: { melhores: entraram.sort((x, y) => y.nota - x.nota).slice(0, 5) } } : {}) }) });
+  const umLead = async (x: any) => {
+    const d = x.data || {};
+    let si = d.siteInfo || null;
+    if (d.site && !si) { try { si = await analisarSite(d.site); } catch { si = { ok: false, erro: "não abriu" }; } }
+    const waSite = (si?.whatsapp || []).length > 0, waCel = celularBR(d.telefone || d.telefoneIntl);
+    const marca = (triagem: any) => db(`pulse_leads?id=eq.${encodeURIComponent(x.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ data: { ...d, ...(si ? { siteInfo: si } : {}), triagem: { ...triagem, por: agente, em: Date.now() } } }) });
+    if (!waSite && !waCel) { descartados++; await marca({ resultado: "sem_whatsapp" }); return; }
+    const falhas: string[] = []; let nota = 6;
+    if (!d.site) { falhas.push("não tem site próprio"); nota += 2; }
+    else if (!si?.ok) { falhas.push("o site não abre"); nota += 2; }
+    else {
+      if (!si.responsivo) { falhas.push("site não se adapta ao celular"); nota += 1; }
+      if (!si.pixelMeta) { falhas.push("site sem pixel da Meta, então não dá para fazer remarketing"); nota += 1; }
+      if (!si.googleTag) falhas.push("site sem Google Analytics");
+    }
+    const ig = d.instagram || si?.instagram?.[0] || "";
+    if (!ig) falhas.push("não achamos Instagram ligado à empresa");
+    nota = Math.min(10, nota);
+    const cat = String(d.categoria || "o serviço").toLowerCase();
+    const gancho = !d.site ? `A ${d.nome} não tem site: quem procura ${cat} em ${d.cidade || "Montes Claros"} no Google acaba achando a concorrência.`
+      : !si?.ok ? `O site da ${d.nome} está fora do ar: quem clica no link do Google não encontra nada.`
+      : !si.pixelMeta ? `A ${d.nome} tem site, mas não mede quem visita: dá para transformar visita em paciente/cliente com anúncios e remarketing.`
+      : `A ${d.nome} já tem estrutura digital: dá para conversar sobre conteúdo e tráfego para crescer.`;
+    // reaproveita a mesma entrada do funil usada pela ferramenta adicionar_ao_funil
+    const res: any = await entregarAoSdr({ empresa: d.nome, lead_id: x.id, nota, nicho: d.categoria, cidade: d.cidade, telefone: d.telefone || d.telefoneIntl, instagram: ig, site: d.site, falhas: falhas.slice(0, 3).join("; "), gancho,
+      extra: `WhatsApp: ${waSite ? "link no site" : "provável (número de celular)"}` }, agente);
+    if (res?.ok) { adicionados++; entraram.push({ empresa: d.nome, nota, motivo: falhas[0] || "estrutura boa" }); }
+    await marca({ resultado: res?.ok ? "funil" : "ja_existia" });
+  };
+  // 6 de cada vez, para não demorar e não derrubar ninguém
+  const fila = lista.slice();
+  const trab = async () => { while (fila.length) { const x = fila.shift(); try { await umLead(x); } catch { /* segue */ } feitos++; if (feitos % 5 === 0) await atualiza(); } };
+  await Promise.all(Array.from({ length: 6 }, trab));
+  await atualiza(true);
+}
+async function verTarefa(agente: string) {
+  const r = await db(`agente_tarefas?agente=eq.${agente}&order=criado_em.desc&limit=1&select=*`);
+  const t = ((await r.json().catch(() => [])) as any[])[0];
+  if (!t) return { erro: "Nenhuma tarefa encontrada." };
+  return { tarefa: t.id, status: t.status, total: t.total, analisados: t.feitos, colocados_no_funil: t.adicionados, sem_whatsapp: t.descartados, melhores: t.resumo?.melhores || [], erro: t.resumo?.erro || "" };
 }
 async function analisarSiteF(a: any) {
   let url = curto(a.url, 300), leadRow: any = null;
@@ -176,7 +250,7 @@ async function entregarAoSdr(a: any, quem = "josue") {
     historico: quem === "josue" ? [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }] : [{ dono: sdr, etapa: "novo", em: agora }],
     atividades: quem === "josue"
       ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Johnny"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
-      : [{ texto: `${NOME[quem]} encontrou, analisou e deu nota ${a.nota ?? "–"}/10`, em: agora }],
+      : [{ texto: `${NOME[quem]} encontrou, analisou e deu nota ${a.nota ?? "–"}/10${a.extra ? ` · ${curto(a.extra, 120)}` : ""}`, em: agora }],
   };
   await salvarAg(l);
   return { ok: true, lead: resumoLead(l) };
@@ -260,7 +334,9 @@ Deno.serve(async (req) => {
   if (!(PERMISSOES[agente] || []).includes(f)) return json({ erro: `${NOME[agente] || agente} não tem acesso a "${f}".` }, 200);
   try {
     let r: unknown;
-    if (f === "buscar_empresas") r = await buscarEmpresas(a);
+    if (f === "triagem_lista") r = await triagemLista(agente, a);
+    else if (f === "ver_tarefa") r = await verTarefa(agente);
+    else if (f === "buscar_empresas") r = await buscarEmpresas(a);
     else if (f === "ver_leads_gerados") r = await verLeadsGerados(a);
     else if (f === "analisar_site") r = await analisarSiteF(a);
     else if (f === "consultar_cnpj") r = await cnpjF(a);

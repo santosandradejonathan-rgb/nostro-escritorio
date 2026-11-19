@@ -7,7 +7,7 @@ const ORIGENS = [
   "https://nostrohub.com.br",
   "https://www.nostrohub.com.br",
 ];
-const MODELO = Deno.env.get("AGENTE_MODELO") || "claude-haiku-5-5";
+const MODELO = Deno.env.get("AGENTE_MODELO") || "claude-sonnet-5-5"; // Sonnet: entende melhor e segue as regras com mais precisão que o Haiku
 
 const NOSTRO = `# Sobre a Nostro
 Agência de marketing de Montes Claros, Minas Gerais. Vende gestão de redes sociais, tráfego pago, posicionamento de imagem, produção audiovisual (vídeo e foto) e outros serviços de marketing. Hoje a maioria dos clientes chega por indicação, e a Nostro está montando a prospecção ativa.`;
@@ -43,7 +43,10 @@ Simpático, jeito mineiro de conversar, analítico quando o assunto é lead. Tom
 - Você tem acesso ao Nostro Hub: à Geração de Leads e ao seu funil no Time de IA. O funil do Jonathan você não mexe: quando qualificar, passa a reunião e o Hub cria o negócio em "Reunião agendada".
 - Quando pedirem uma tarefa (buscar, analisar, colocar no funil, mover, anotar, atualizar, passar), use as ferramentas de verdade. Antes, diga só uma frase curta ("Deixa eu puxar aqui."). Depois conte o resultado em 1 ou 2 frases, com os números principais e no máximo 3 nomes. Não leia listas em voz alta: tudo fica salvo no Hub.
 - Quando falarem de lista, contatos, empresas ou leads do Hub, CONSULTE com a ferramenta (ver_leads_gerados ou ver_funil) antes de responder. Nunca diga que não encontrou ou que não tem acesso sem ter consultado.
-- Para analisar várias empresas, chame a análise de várias de uma vez (até 5 por vez).
+- Para analisar a lista inteira ou muitas empresas de uma vez, use triagem_lista: ela roda sozinha em segundo plano, analisa todo mundo e coloca no seu funil quem tem WhatsApp. Diga numa frase que começou e que leva de 1 a 3 minutos. Quando perguntarem como está ou se terminou, use ver_tarefa e responda com os números.
+- Critério do Jonathan para entrar no funil: tem WhatsApp, entra. Quem não tem site também é potencial, porque dá para vender site. Só fica de fora quem não tem WhatsApp. Prospectar (mandar mensagem) só quando ele mandar.
+- Nunca diga que vai fazer algo depois ou "em silêncio" sem ter chamado a ferramenta agora. Se não chamou, não fez.
+- Para analisar poucas empresas (até 5), use analisar_site direto, várias de uma vez.
 - Em tarefa com várias etapas (analisar uma lista, vários lotes), NÃO narre cada etapa. Fale só uma frase curta no começo e, no fim, o resultado em no máximo 3 frases: quantas analisou, quantas colocou no funil e as 2 ou 3 melhores com o motivo.
 - Antes de passar para o Jonathan, tenha a data e a hora da reunião e um resumo. Se faltar a data ou a hora, pergunte.
 - Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
@@ -82,7 +85,7 @@ ${historico}
 
 # Formato da resposta (vai ser lida em voz alta, numa conversa ao vivo)
 - Português do Brasil falado, do jeito que se fala no dia a dia de Minas: "tô", "pra", "né", "tá", "a gente", "olha", "então". Sem exagerar nem forçar sotaque.
-- Curto: na maioria das vezes 1 ou 2 frases. Só se estenda se pedirem detalhe, e mesmo assim vá por partes e pergunte se quer que continue.
+- Pontual: no máximo 2 frases. Responda primeiro exatamente o que foi perguntado (o número, o nome, o sim ou não) e pare. Só se estenda se pedirem detalhe.
 - Comece pela resposta, sem rodeio e sem repetir a pergunta. Frases curtas, uma ideia por frase.
 - Nada de tom de relatório, de lista falada ou de "primeiro, segundo, terceiro".
 - Sem markdown, sem listas, sem asteriscos, sem emojis, sem marcações entre colchetes.
@@ -133,8 +136,10 @@ const ETAPAS = ["novo", "abordado", "followup", "respondeu", "qualificando", "qu
 const F_VER_FUNIL = T("ver_funil", "Mostra os leads do funil do Time de IA no Hub, com a etapa de cada um. Use para saber como está o funil ou achar um lead.", { etapa: str("Opcional: filtra por etapa.") });
 const FERRAMENTAS: Record<string, any[]> = {
   calebe: [
+    T("triagem_lista", "Analisa TODA a lista da Geração de Leads em segundo plano (site, WhatsApp, Instagram), dá nota e coloca no seu funil quem tem WhatsApp. Use para \"analisa todos\", \"verifica a lista inteira\". Pode filtrar por nicho ou cidade.", { filtro: str("Opcional: nicho, nome ou cidade. Vazio = lista toda.") }),
+    T("ver_tarefa", "Mostra o andamento ou o resultado da última triagem: quantos analisou, quantos entraram no funil, quantos sem WhatsApp e os melhores.", {}),
     T("buscar_empresas", "Busca empresas de um nicho numa cidade (a mesma busca da Geração de Leads do Hub) e salva lá. Gasta 1 busca da cota do mês.", { nicho: str("Ex.: dentista, academia, pizzaria."), local: str("Cidade e estado. Padrão: Montes Claros, MG.") }, ["nicho"]),
-    T("ver_leads_gerados", "Lista as empresas já salvas na Geração de Leads do Hub.", { filtro: str("Opcional: parte do nome, nicho ou cidade.") }),
+    T("ver_leads_gerados", "Mostra a Geração de Leads do Hub: total, quantos têm site, celular, já estão no funil, e 25 empresas por página.", { filtro: str("Opcional: parte do nome, nicho ou cidade."), pagina: { type: "number", description: "Página (25 por página). Padrão 1." } }),
     T("analisar_site", "Abre o site de uma empresa e diz se tem Instagram, WhatsApp, e-mail, CNPJ, Pixel da Meta, Google Tag/Ads, se é responsivo e a plataforma.", { lead_id: str("lead_id que veio da busca (preferível)."), url: str("Ou o endereço do site.") }),
     T("consultar_cnpj", "Consulta dados públicos da Receita: razão social, situação, abertura, porte, atividade, sócios.", { cnpj: str("Os 14 números.") }, ["cnpj"]),
     T("adicionar_ao_funil", "Coloca a empresa no seu funil do Time de IA, na primeira etapa, com a nota, as falhas e o gancho da sua análise.", {
@@ -250,7 +255,7 @@ Deno.serve(async (req) => {
     method: "POST",
     headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model: MODELO, max_tokens: 900, thinking: { type: "disabled" }, stream: comFluxo, system, messages: conversa,
+      model: MODELO, max_tokens: 900, thinking: { type: /haiku/.test(MODELO) ? "disabled" : "between_tools" }, stream: comFluxo, system, messages: conversa,
       ...(tools ? { tools, tool_choice: ultima ? { type: "none" } : { type: "auto" } } : {}),
     }),
   });
@@ -281,19 +286,25 @@ Deno.serve(async (req) => {
                 const linha = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
                 if (!linha.startsWith("data:")) continue;
                 let ev: any; try { ev = JSON.parse(linha.slice(5).trim()); } catch { continue; }
-                if (ev.type === "content_block_start") blocos[ev.index] = ev.content_block.type === "tool_use" ? { ...ev.content_block, json: "" } : { type: "text", text: "" };
+                if (ev.type === "content_block_start") {
+                  const cb = ev.content_block;
+                  blocos[ev.index] = cb.type === "tool_use" ? { ...cb, json: "" } : cb.type === "thinking" ? { type: "thinking", thinking: "", signature: "" } : cb.type === "text" ? { type: "text", text: "" } : { ...cb };
+                }
                 else if (ev.type === "content_block_delta") {
                   const b = blocos[ev.index];
                   if (ev.delta?.type === "text_delta") { if (b) b.text += ev.delta.text; fala(ev.delta.text); }
                   else if (ev.delta?.type === "input_json_delta" && b) b.json += ev.delta.partial_json;
+                  else if (ev.delta?.type === "thinking_delta" && b) b.thinking += ev.delta.thinking;
+                  else if (ev.delta?.type === "signature_delta" && b) b.signature += ev.delta.signature;
                 } else if (ev.type === "message_delta") parada = ev.delta?.stop_reason || parada;
               }
             }
             const usos = blocos.filter((b) => b && b.type === "tool_use");
             if (parada !== "tool_use" || !usos.length) { if (guardado) manda(guardado); break; }
+            // as notas entre ferramentas (thinking) voltam junto, como a API pede
             const conteudo = blocos.filter(Boolean).map((b) => b.type === "tool_use"
               ? { type: "tool_use", id: b.id, name: b.name, input: (() => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } })() }
-              : { type: "text", text: b.text }).filter((b) => b.type === "tool_use" || b.text.trim());
+              : b.type === "text" ? { type: "text", text: b.text } : b).filter((b: any) => b.type !== "text" || b.text.trim());
             conversa.push({ role: "assistant", content: conteudo });
             const resultados = await Promise.all(conteudo.filter((b: any) => b.type === "tool_use").map(async (b: any) =>
               ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) })));
