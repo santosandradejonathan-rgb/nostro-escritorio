@@ -29,11 +29,7 @@ footer{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column
 #estado{font:700 16px Rajdhani,sans-serif;letter-spacing:.14em;color:var(--or2);min-height:22px;text-shadow:0 0 12px rgba(255,164,54,.5)}
 .wave{display:flex;align-items:center;gap:4px;height:34px}
 .wave b{width:4px;height:4px;border-radius:2px;background:var(--or);opacity:.35;transition:height .12s,opacity .2s}
-#mic{width:74px;height:74px;border-radius:50%;border:1.5px solid var(--or);background:rgba(40,20,4,.7);color:var(--or2);cursor:pointer;display:grid;place-items:center;transition:transform .15s,background .3s}
-#mic:hover{transform:scale(1.04)}#mic:focus-visible{outline:2px solid var(--or2);outline-offset:4px}
-#mic svg{width:30px;height:30px}
-body.ouvindo #mic{background:var(--or);color:#1a0d00}
-.nota{font-size:12px;color:var(--mut)}
+body.ouvindo .nota{font-size:12px;color:var(--mut)}
 .trilha{fill:none;stroke:#FF9A2E;stroke-opacity:.28;stroke-width:2.5}
 .fluxo{fill:none;stroke:var(--or);stroke-width:3;stroke-dasharray:12 44;opacity:.35;animation:corre 3s linear infinite}
 .fluxo.on{opacity:1;stroke:var(--or2);stroke-width:4.5;animation-duration:.8s;filter:url(#brilho)}
@@ -50,8 +46,7 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 @keyframes respira{50%{opacity:.35}}
 @keyframes pisca{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
-@media (max-width:600px){.sub{display:none}#mic{width:64px;height:64px}.nota{display:none}}
-</style>
+@media (max-width:600px){.sub{display:none}</style>
 </head>
 <body>
 <main>
@@ -101,12 +96,9 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 </header>
 
 <footer>
-  <div id="estado">PRONTO PARA OUVIR</div>
+  <div id="estado">TOQUE NA TELA PARA COMEÇAR</div>
   <div class="wave" id="onda"></div>
-  <button id="mic" aria-label="Falar com a Vanessa">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-  </button>
-  <div class="nota" id="nota">Clique no microfone para conversar com a Vanessa.</div>
+  <div class="nota" id="nota">Depois é só falar. Toque de novo na tela para interromper; Esc encerra.</div>
 </footer>
 
 <script>
@@ -138,7 +130,7 @@ for(const f of ferramentas){
 }
 const SUPA='https://isfyxyoelqmncqxcrvlx.supabase.co',KEY='sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z';
 const FN_AGENTE=SUPA+'/functions/v1/agente',FN_VOZ=SUPA+'/functions/v1/voz',AG='calebe',PESSOA='jonathan';
-const estado=document.getElementById('estado'),mic=document.getElementById('mic'),corpo=document.body,nota=document.getElementById('nota');
+const estado=document.getElementById('estado'),corpo=document.body,nota=document.getElementById('nota');
 const onda=document.getElementById('onda');const barras=[];
 for(let i=0;i<28;i++){const b=document.createElement('b');onda.appendChild(b);barras.push(b)}
 let atual='',nivel=0,nivelMic=0;
@@ -171,13 +163,12 @@ function ouvir(){
     rec.onend=()=>{if(conversa&&atual==='ouvindo'){try{rec.start()}catch(e){}}}}
   try{rec.start()}catch(e){}}
 function paraDeOuvir(){clearTimeout(tSil);clearTimeout(tOcioso);if(rec){try{rec.stop()}catch(e){}}}
-function iniciar(){if(!SR){fase('','ABRA NO CHROME PARA FALAR COM A VANESSA');return}conversa=true;sess={inicio:new Date().toISOString(),msgs:[]};nota.textContent='Clique no microfone para interromper ou encerrar.';ouvir()}
-function encerrar(){conversa=false;paraDeOuvir();pararTudo();fase('','PRONTO PARA OUVIR');liga([]);nota.textContent='Clique no microfone para conversar com a Vanessa.'}
+function iniciar(){if(!SR){fase('','ABRA NO CHROME PARA FALAR COM A VANESSA');return}conversa=true;sess={inicio:new Date().toISOString(),msgs:[]};nota.textContent='';ouvir()}
+function encerrar(){conversa=false;paraDeOuvir();pararTudo();fase('','TOQUE NA TELA PARA CONVERSAR');liga([]);nota.textContent=''}
 function pararTudo(){if(ctl){try{ctl.abort()}catch(e){}ctl=null}fila=null;if(AUD){try{AUD.pause()}catch(e){}AUD=null}}
-mic.addEventListener('click',()=>{prepAudio();
+document.addEventListener('pointerdown',()=>{prepAudio();
   if(!conversa){iniciar();return}
-  if(atual==='falando'||atual==='pensando'){pararTudo();ouvir();return}
-  encerrar()});
+  if(atual==='falando'||atual==='pensando'){pararTudo();ouvir()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&conversa)encerrar()});
 window.vanessaTexto=t=>{prepAudio();if(!sess)sess={inicio:new Date().toISOString(),msgs:[]};enviar(String(t||''))};
 
@@ -191,7 +182,7 @@ async function toca(f){if(fila!==f)return;const p=f.itens.shift();if(!p){f.tocan
   if(atual!=='falando')fase('falando','VANESSA FALANDO');
   au.onended=au.onerror=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;toca(f)};
   au.play().catch(()=>{if(AUD===au)AUD=null;toca(f)})}
-function terminouFala(f){if(fila!==f)return;fila=null;if(encerrarDepois){encerrarDepois=false;encerrar();return}if(conversa)setTimeout(()=>{if(conversa&&atual!=='ouvindo')ouvir()},350);else fase('','PRONTO PARA OUVIR')}
+function terminouFala(f){if(fila!==f)return;fila=null;if(encerrarDepois){encerrarDepois=false;encerrar();return}if(conversa)setTimeout(()=>{if(conversa&&atual!=='ouvindo')ouvir()},350);else fase('','TOQUE NA TELA PARA CONVERSAR')}
 async function enviar(texto){
   paraDeOuvir();encerrarDepois=/^(tchau|at[eé] (mais|logo|amanh[aã])|pode encerrar|encerrar|desligar|valeu,? tchau)/i.test(texto);
   fase('pensando','PENSANDO');liga(ferramentasDe(texto));memAdd('u',texto);
