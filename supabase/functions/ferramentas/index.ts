@@ -245,7 +245,7 @@ async function entregarAoSdr(a: any, quem = "josue") {
     nicho: curto(a.nicho || base.categoria, 80), cidade: curto(a.cidade || base.cidade || "Montes Claros", 60), bairro: curto(a.bairro, 60),
     telefone: curto(a.telefone || base.telefone || base.telefoneIntl, 30), instagram: ig ? "@" + ig : "", site: curto(a.site || base.site, 200),
     google: curto(a.google, 60), falhas: curto(a.falhas, 600), gancho: curto(a.gancho, 400),
-    fonte: `${NOME[quem]}, pelo escritório virtual (${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })})`,
+    fonte: `${NOME[quem]}, pelo Comercial IA (${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })})`,
     leadGeradoId: a.lead_id || null, criadoEm: agora, etapaDesde: agora,
     historico: quem === "josue" ? [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }] : [{ dono: sdr, etapa: "novo", em: agora }],
     atividades: quem === "josue"

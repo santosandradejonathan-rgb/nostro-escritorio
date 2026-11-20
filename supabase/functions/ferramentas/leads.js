@@ -1,10 +1,7 @@
-// Trecho do gerador de leads do Nostro Hub (functions/api/leads/[acao].js), usado pelas ferramentas do Josué.
+// Trecho do gerador de leads do Nostro Hub (functions/api/leads/[acao].js), usado pelas ferramentas do Comercial IA.
+// A busca principal é feita pelo próprio Hub (rota buscar-agente); isto aqui é a reserva e a análise de site/CNPJ.
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
-function json(o, status = 200) {
-  return new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
-}
 function falha(status, publico, detalhe) { const e = new Error(detalhe || publico); e.status = status; e.publico = publico; return e; }
-const limpa = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
 async function comPrazo(url, opts = {}, ms = 9000) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), ms);
@@ -13,10 +10,8 @@ async function comPrazo(url, opts = {}, ms = 9000) {
 }
 
 const UA_OSM = 'NostroHub/1.0 (+https://nostrohub.com.br)';
-const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const LIMITES = { 1: 50, 2: 100, 3: 200 };
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-// Nichos comuns em português -> etiquetas do OpenStreetMap
 const NICHOS_OSM = [
   [/dent|odont/, ['amenity=dentist', 'healthcare=dentist']],
   [/academia|fitness|crossfit|musculac|pilates/, ['leisure=fitness_centre', 'leisure=sports_centre']],
@@ -59,7 +54,6 @@ const NICHOS_OSM = [
 ];
 const PALAVRAS_GENERICAS = new Set(['clinica', 'loja', 'casa', 'centro', 'empresa', 'servico', 'servicos', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'para', 'the', 'and', 'of', 'shop', 'store']);
 const CATEGORIA_OSM = { dentist: 'Dentista', fitness_centre: 'Academia', sports_centre: 'Centro esportivo', restaurant: 'Restaurante', fast_food: 'Lanchonete', cafe: 'Café', bar: 'Bar', pub: 'Bar', bakery: 'Padaria', supermarket: 'Supermercado', convenience: 'Conveniência', pharmacy: 'Farmácia', hairdresser: 'Salão / barbearia', beauty: 'Estética', clothes: 'Loja de roupas', boutique: 'Boutique', shoes: 'Calçados', optician: 'Ótica', pet: 'Pet shop', veterinary: 'Veterinário', estate_agent: 'Imobiliária', accountant: 'Contabilidade', lawyer: 'Advocacia', physiotherapist: 'Fisioterapia', psychotherapist: 'Psicologia', clinic: 'Clínica', doctors: 'Consultório médico', hotel: 'Hotel', guest_house: 'Pousada', hostel: 'Hostel', school: 'Escola', language_school: 'Escola de idiomas', training: 'Cursos', car_repair: 'Oficina', car_parts: 'Autopeças', hardware: 'Material de construção', doityourself: 'Material de construção', construction_company: 'Construtora', engineer: 'Engenharia', furniture: 'Móveis', jewelry: 'Joalheria', florist: 'Floricultura', copyshop: 'Gráfica', printer: 'Gráfica', security: 'Segurança', agrarian: 'Agropecuária', cosmetics: 'Cosméticos', perfumery: 'Perfumaria', place_of_worship: 'Igreja' };
-
 const CATEGORIA_TT = { DENTIST: 'Dentista', DOCTOR: 'Consultório médico', HOSPITAL_POLYCLINIC: 'Hospital / clínica', HEALTH_CARE_SERVICE: 'Saúde', PHARMACY: 'Farmácia', RESTAURANT: 'Restaurante', CAFE_PUB: 'Café / bar', HOTEL_MOTEL: 'Hotel', SHOP: 'Loja', CLUB_ASSOCIATION: 'Clube', FITNESS_CLUB_CENTER: 'Academia', SPORTS_CENTER: 'Centro esportivo', BEAUTY_SALON: 'Salão de beleza', HAIRDRESSER: 'Cabeleireiro', REAL_ESTATE_AGENT: 'Imobiliária', LEGAL_SERVICES: 'Advocacia', SCHOOL: 'Escola', COLLEGE_UNIVERSITY: 'Faculdade', LANGUAGE_SCHOOL: 'Escola de idiomas', REPAIR_FACILITY: 'Oficina', CAR_DEALER: 'Concessionária', VETERINARIAN: 'Veterinário', BANK: 'Banco', COMPANY: 'Empresa', PLACE_OF_WORSHIP: 'Igreja', MARKET: 'Mercado', BAKERY: 'Padaria', GENERAL_PRACTITIONER: 'Clínico geral', OPTICIAN: 'Ótica', PET_SHOP: 'Pet shop', ACCOUNTANT: 'Contabilidade', FINANCIAL_INSTITUTION: 'Financeira', IMPORTANT_TOURIST_ATTRACTION: 'Atração turística' };
 
 export function telefoneBR(bruto) {
@@ -67,7 +61,7 @@ export function telefoneBR(bruto) {
   if (!d) return { nac: '', intl: '' };
   let n = d;
   if (/^55\d{10,11}$/.test(d)) n = d.slice(2);
-  else if (/^0\d{10,11}$/.test(d)) n = d.slice(1);             // 0 + DDD (discagem antiga)
+  else if (/^0\d{10,11}$/.test(d)) n = d.slice(1);
   if (n.length === 10 || n.length === 11) {
     const nac = n.length === 11 ? `(${n.slice(0, 2)}) ${n.slice(2, 7)}-${n.slice(7)}` : `(${n.slice(0, 2)}) ${n.slice(2, 6)}-${n.slice(6)}`;
     return { nac, intl: '+55' + n };
@@ -124,12 +118,10 @@ function raioDoBbox(bb) {
 async function buscarTomTom(termo, centro, limite, env) {
   const out = [];
   const base = `key=${encodeURIComponent(env.TOMTOM_KEY)}&language=pt-BR&lat=${centro.lat}&lon=${centro.lon}&radius=${centro.raio}`;
-  // 1) busca por categoria (ex.: "dentista") e 2) busca livre em estabelecimentos (nome + categoria)
   const urls = [
     `https://api.tomtom.com/search/2/categorySearch/${encodeURIComponent(termo)}.json?${base}&limit=100`,
     `https://api.tomtom.com/search/2/search/${encodeURIComponent(termo)}.json?${base}&idxSet=POI&limit=100`
   ];
-  if (limite > 100) urls.push(`https://api.tomtom.com/search/2/search/${encodeURIComponent(termo)}.json?${base}&idxSet=POI&limit=100&ofs=100`);
   let erro = '';
   for (const u of urls) {
     try {
@@ -152,21 +144,13 @@ export function normalizarTomTom(x) {
   const tel = telefoneBR(p.phone);
   const pais = a.countryCode || '';
   return {
-    id: 't:' + x.id,
-    nome: p.name,
-    categoria: cat,
-    endereco: a.freeformAddress || '',
+    id: 't:' + x.id, nome: p.name, categoria: cat, endereco: a.freeformAddress || '',
     cidade: a.municipality || a.municipalitySubdivision || '',
     uf: String(a.countrySubdivisionCode || a.countrySubdivision || '').replace(/^[A-Z]{2}-/, ''),
-    pais,
-    telefone: pais === 'BR' ? tel.nac : '',
+    pais, telefone: pais === 'BR' ? tel.nac : '',
     telefoneIntl: pais === 'BR' ? tel.intl : (String(p.phone || '').replace(/[^\d+]/g, '').replace(/^(?!\+)/, '+')),
-    site: siteComProtocolo(p.url),
-    nota: null,
-    avaliacoes: null,
-    maps: linkGoogleMaps(p.name, a.freeformAddress),
-    lat: x.position && x.position.lat, lon: x.position && x.position.lon,
-    fonte: 'TomTom'
+    site: siteComProtocolo(p.url), nota: null, avaliacoes: null, maps: linkGoogleMaps(p.name, a.freeformAddress),
+    lat: x.position && x.position.lat, lon: x.position && x.position.lon, fonte: 'TomTom'
   };
 }
 
@@ -187,15 +171,12 @@ export function consultaOverpass(termo, centro) {
 async function buscarOSM(termo, centro) {
   const q = consultaOverpass(termo, centro);
   if (!q) return [];
-  for (const host of ['https://overpass-api.de/api/interpreter']) {
-    try {
-      const r = await comPrazo(host, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA_OSM }, body: 'data=' + encodeURIComponent(q) }, 9000);
-      if (!r.ok) continue;
-      const j = await r.json();
-      return (j.elements || []).map(normalizarOSM).filter(Boolean);
-    } catch (e) { /* tenta o outro servidor */ }
-  }
-  return [];
+  try {
+    const r = await comPrazo('https://overpass-api.de/api/interpreter', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA_OSM }, body: 'data=' + encodeURIComponent(q) }, 9000);
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.elements || []).map(normalizarOSM).filter(Boolean);
+  } catch (e) { return []; }
 }
 export function normalizarOSM(el) {
   const t = (el && el.tags) || {};
@@ -206,26 +187,13 @@ export function normalizarOSM(el) {
   const endereco = [rua, t['addr:suburb'], [t['addr:city'], t['addr:state']].filter(Boolean).join(' - ')].filter(Boolean).join(' - ');
   const lat = el.lat != null ? el.lat : el.center && el.center.lat, lon = el.lon != null ? el.lon : el.center && el.center.lon;
   return {
-    id: 'o:' + el.type + '/' + el.id,
-    nome: t.name,
-    categoria: CATEGORIA_OSM[tipo] || (tipo ? tipo.replace(/_/g, ' ') : ''),
-    endereco,
-    cidade: t['addr:city'] || '',
-    uf: t['addr:state'] || '',
-    pais: (t['addr:country'] || '').toUpperCase(),
-    telefone: tel.nac,
-    telefoneIntl: tel.intl,
-    site: siteComProtocolo(t.website || t['contact:website'] || t.url || ''),
-    email: t.email || t['contact:email'] || '',
-    instagram: handleInstagram(t['contact:instagram'] || t.instagram || ''),
-    nota: null,
-    avaliacoes: null,
-    maps: linkGoogleMaps(t.name, endereco || t['addr:city'] || ''),
-    lat, lon,
-    fonte: 'OpenStreetMap'
+    id: 'o:' + el.type + '/' + el.id, nome: t.name, categoria: CATEGORIA_OSM[tipo] || (tipo ? tipo.replace(/_/g, ' ') : ''),
+    endereco, cidade: t['addr:city'] || '', uf: t['addr:state'] || '', pais: (t['addr:country'] || '').toUpperCase(),
+    telefone: tel.nac, telefoneIntl: tel.intl, site: siteComProtocolo(t.website || t['contact:website'] || t.url || ''),
+    email: t.email || t['contact:email'] || '', instagram: handleInstagram(t['contact:instagram'] || t.instagram || ''),
+    nota: null, avaliacoes: null, maps: linkGoogleMaps(t.name, endereco || t['addr:city'] || ''), lat, lon, fonte: 'OpenStreetMap'
   };
 }
-// Junta TomTom + OSM: mesma empresa (nome igual ou mesmo telefone) vira uma só, completando o que faltar.
 export function juntarFontes(listas) {
   const out = [];
   const chaveNome = l => semAcento(l.nome).replace(/[^a-z0-9]/g, '');
@@ -247,7 +215,7 @@ const EMAIL_RUIM = /\.(png|jpe?g|gif|webp|svg|css|js|ico|avif|bmp)$|@(sentry|wix
 export function hostProibido(host) {
   const h = String(host || '').toLowerCase();
   if (!h || h === 'localhost' || h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')) return true;
-  if (/^\[|:/.test(h)) return true;                                   // IPv6 literal
+  if (/^\[|:/.test(h)) return true;
   const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (m) {
     const [a, b] = [+m[1], +m[2]];
@@ -280,11 +248,9 @@ function decodificar(html) {
 }
 const unicos = arr => [...new Set(arr.filter(Boolean))];
 
-// Lê o HTML e tira o que interessa para a prospecção. Exportado para os testes.
 export function extrairDoHtml(htmlBruto, baseUrl) {
   const html = decodificar(htmlBruto || '');
   const out = { instagram: [], facebook: [], whatsapp: [], emails: [], telefones: [], cnpjs: [], pixelMeta: false, googleTag: false, googleAds: false, responsivo: false, titulo: '', plataforma: '' };
-
   for (const m of html.matchAll(/instagram\.com\/([A-Za-z0-9_.]{1,30})(?![A-Za-z0-9_.])/gi)) {
     const h = m[1].replace(/\.+$/, '').toLowerCase();
     if (h && !IG_RESERVADO.has(h)) out.instagram.push(h);
@@ -321,7 +287,6 @@ export function extrairDoHtml(htmlBruto, baseUrl) {
     : /squarespace/i.test(html) ? 'Squarespace'
     : /webflow/i.test(html) ? 'Webflow'
     : /linktr\.ee|linktree/i.test(html) ? 'Linktree' : '';
-  // link para a página de contato do mesmo site (para uma segunda leitura)
   out.paginaContato = '';
   if (baseUrl) {
     for (const m of html.matchAll(/href=["']([^"'#]+)["']/gi)) {
@@ -366,8 +331,6 @@ async function analisarSite(urlTxt) {
   if (!url) throw falha(400, 'Endereço de site inválido.');
   const tipo = tipoDoEndereco(url);
   const base = { url: url.href, tipo, ok: false, https: url.protocol === 'https:', status: 0, erro: '', analisadoEm: Date.now() };
-
-  // Quando o "site" no Google é o próprio Instagram/Facebook/WhatsApp, não tem site de verdade.
   if (tipo === 'instagram') {
     const h = (url.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
     return { ...base, ok: true, ...vazio(), instagram: h && !IG_RESERVADO.has(h) ? [h] : [] };
@@ -377,11 +340,9 @@ async function analisarSite(urlTxt) {
     const d = (url.pathname + url.search).replace(/\D/g, '');
     return { ...base, ok: true, ...vazio(), whatsapp: d.length >= 10 ? [d] : [] };
   }
-
   let r;
   try { r = await baixarHtml(url, 9000); }
   catch (e) {
-    // muitos sites antigos só abrem em http
     if (url.protocol === 'https:') {
       try { const u2 = new URL(url.href.replace(/^https:/, 'http:')); r = await baixarHtml(u2, 7000); base.https = false; }
       catch (e2) { return { ...base, ...vazio(), erro: 'O site não abriu (fora do ar ou muito lento).' }; }
@@ -407,7 +368,6 @@ async function analisarSite(urlTxt) {
 }
 function vazio() { return { instagram: [], facebook: [], whatsapp: [], emails: [], telefones: [], cnpjs: [], pixelMeta: false, googleTag: false, googleAds: false, responsivo: false, titulo: '', plataforma: '' }; }
 
-/* ---------------- 3. CNPJ (dados públicos da Receita) ---------------- */
 async function consultarCnpj(cnpjTxt) {
   const d = String(cnpjTxt || '').replace(/\D/g, '');
   if (!digitosCnpjValidos(d)) throw falha(400, 'CNPJ inválido. Confira os 14 números.');
@@ -433,19 +393,11 @@ async function consultarCnpj(cnpjTxt) {
 export function normalizarCnpj(j, d, fonte) {
   const porte = j.porte || j.descricao_porte || '';
   return {
-    cnpj: d,
-    razao: j.razao_social || '',
-    fantasia: j.nome_fantasia || '',
-    situacao: j.descricao_situacao_cadastral || '',
-    abertura: j.data_inicio_atividade || '',
-    porte: String(porte).replace(/^DEMAIS$/i, 'Demais (médio/grande)'),
-    atividade: j.cnae_fiscal_descricao || '',
-    capital: +j.capital_social || 0,
-    cidade: j.municipio || '',
-    uf: j.uf || '',
+    cnpj: d, razao: j.razao_social || '', fantasia: j.nome_fantasia || '', situacao: j.descricao_situacao_cadastral || '',
+    abertura: j.data_inicio_atividade || '', porte: String(porte).replace(/^DEMAIS$/i, 'Demais (médio/grande)'),
+    atividade: j.cnae_fiscal_descricao || '', capital: +j.capital_social || 0, cidade: j.municipio || '', uf: j.uf || '',
     socios: (j.qsa || []).slice(0, 6).map(s => ({ nome: s.nome_socio || s.nome || '', qualificacao: s.qualificacao_socio || s.descricao_qualificacao_socio || '' })).filter(s => s.nome),
-    fonte,
-    consultadoEm: Date.now()
+    fonte, consultadoEm: Date.now()
   };
 }
 
