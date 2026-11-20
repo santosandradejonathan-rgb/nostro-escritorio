@@ -96,9 +96,9 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 </header>
 
 <footer>
-  <div id="estado">TOQUE NA TELA PARA COMEÇAR</div>
+  <div id="estado">TOQUE NA TELA OU APERTE ESPAÇO PARA COMEÇAR</div>
   <div class="wave" id="onda"></div>
-  <div class="nota" id="nota">Depois é só falar. Toque de novo na tela para interromper; Esc encerra.</div>
+  <div class="nota" id="nota">Espaço liga e desliga o microfone · toque na tela para interromper · Esc encerra</div>
 </footer>
 
 <script>
@@ -150,10 +150,12 @@ let VOZ_ESC='';fetch(SUPA+'/rest/v1/escritorio_vozes?select=voz&agente=eq.'+AG,{
 function memAdd(quem,texto){texto=String(texto||'').trim();if(!texto)return;fetch(SUPA+'/rest/v1/escritorio_memoria',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({agente:AG,pessoa:PESSOA,quem,texto:texto.slice(0,1200)})}).catch(()=>{})}
 
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let conversa=false,sess=null,rec=null,buf='',interino='',tSil=null,tOcioso=null,ctl=null,fila=null,AUD=null,encerrarDepois=false;
+let mudo=false,conversa=false,sess=null,rec=null,buf='',interino='',tSil=null,tOcioso=null,ctl=null,fila=null,AUD=null,encerrarDepois=false;
 const CONECTOR=/\b(e|de|do|da|que|pra|para|com|o|a|os|as|um|uma|no|na|em|mas|ou|se|porque|então|tipo|aí)$/i;
 function ouvir(){
-  if(!conversa)return;buf='';interino='';fase('ouvindo','OUVINDO');liga([]);
+  if(!conversa)return;buf='';interino='';liga([]);
+  if(mudo){paraDeOuvir();fase('mudo','MICROFONE DESLIGADO · ESPAÇO PARA LIGAR');return}
+  fase('ouvindo','OUVINDO');
   clearTimeout(tOcioso);tOcioso=setTimeout(()=>{if(atual==='ouvindo'&&!buf&&!interino)encerrar()},90000);
   if(!rec){rec=new SR();rec.lang='pt-BR';rec.continuous=true;rec.interimResults=true;
     rec.onresult=e=>{if(atual!=='ouvindo')return;let fin='',inter='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)fin+=r[0].transcript+' ';else inter+=r[0].transcript}
@@ -163,13 +165,18 @@ function ouvir(){
     rec.onend=()=>{if(conversa&&atual==='ouvindo'){try{rec.start()}catch(e){}}}}
   try{rec.start()}catch(e){}}
 function paraDeOuvir(){clearTimeout(tSil);clearTimeout(tOcioso);if(rec){try{rec.stop()}catch(e){}}}
-function iniciar(){if(!SR){fase('','ABRA NO CHROME PARA FALAR COM A VANESSA');return}conversa=true;sess={inicio:new Date().toISOString(),msgs:[]};nota.textContent='';ouvir()}
-function encerrar(){conversa=false;paraDeOuvir();pararTudo();fase('','TOQUE NA TELA PARA CONVERSAR');liga([]);nota.textContent=''}
+function iniciar(){if(!SR){fase('','ABRA NO CHROME PARA FALAR COM A VANESSA');return}conversa=true;sess={inicio:new Date().toISOString(),msgs:[]};ouvir()}
+function encerrar(){conversa=false;paraDeOuvir();pararTudo();fase('','TOQUE NA TELA OU APERTE ESPAÇO PARA CONVERSAR');liga([])}
 function pararTudo(){if(ctl){try{ctl.abort()}catch(e){}ctl=null}fila=null;if(AUD){try{AUD.pause()}catch(e){}AUD=null}}
 document.addEventListener('pointerdown',()=>{prepAudio();
   if(!conversa){iniciar();return}
   if(atual==='falando'||atual==='pensando'){pararTudo();ouvir()}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&conversa)encerrar()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&conversa){encerrar();return}
+  if(e.code==='Space'&&!e.repeat){e.preventDefault();prepAudio();
+    if(!conversa){mudo=false;iniciar();return}
+    mudo=!mudo;
+    if(mudo){if(atual==='ouvindo'){paraDeOuvir();fase('mudo','MICROFONE DESLIGADO · ESPAÇO PARA LIGAR')}}
+    else if(atual==='mudo')ouvir()}});
 window.vanessaTexto=t=>{prepAudio();if(!sess)sess={inicio:new Date().toISOString(),msgs:[]};enviar(String(t||''))};
 
 const abrev=t=>t.replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ');
@@ -182,7 +189,7 @@ async function toca(f){if(fila!==f)return;const p=f.itens.shift();if(!p){f.tocan
   if(atual!=='falando')fase('falando','VANESSA FALANDO');
   au.onended=au.onerror=()=>{URL.revokeObjectURL(url);if(AUD===au)AUD=null;toca(f)};
   au.play().catch(()=>{if(AUD===au)AUD=null;toca(f)})}
-function terminouFala(f){if(fila!==f)return;fila=null;if(encerrarDepois){encerrarDepois=false;encerrar();return}if(conversa)setTimeout(()=>{if(conversa&&atual!=='ouvindo')ouvir()},350);else fase('','TOQUE NA TELA PARA CONVERSAR')}
+function terminouFala(f){if(fila!==f)return;fila=null;if(encerrarDepois){encerrarDepois=false;encerrar();return}if(conversa)setTimeout(()=>{if(conversa&&atual!=='ouvindo')ouvir()},350);else fase('','TOQUE NA TELA OU APERTE ESPAÇO PARA CONVERSAR')}
 async function enviar(texto){
   paraDeOuvir();encerrarDepois=/^(tchau|at[eé] (mais|logo|amanh[aã])|pode encerrar|encerrar|desligar|valeu,? tchau)/i.test(texto);
   fase('pensando','PENSANDO');liga(ferramentasDe(texto));memAdd('u',texto);
