@@ -1,6 +1,6 @@
 // Ferramentas do Time de IA no Nostro Hub.
 // Só a função "agente" chama esta (com a chave de serviço do próprio projeto). Cada agente só usa as suas.
-// Hoje o Johnny (id interno "calebe") faz tudo: Geração de Leads (buscar, analisar site, CNPJ, triagem da lista toda), coloca no próprio funil, mexe nele e passa a reunião para o Jonathan.
+// Hoje a Vanessa (id interno "calebe") faz tudo: Geração de Leads (buscar, analisar site, CNPJ, triagem da lista toda), coloca no próprio funil, mexe nele e passa a reunião para o Jonathan.
 // O funil do Jonathan não é mexido aqui: a passagem fica marcada e o Hub cria o negócio quando abre.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 declare const EdgeRuntime: any;
@@ -10,7 +10,7 @@ const URL_SB = Deno.env.get("SUPABASE_URL") || "";
 const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PERMISSOES: Record<string, string[]> = {
   josue: ["buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "entregar_ao_sdr", "ver_funil"],
-  // o Johnny hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
+  // a Vanessa hoje faz tudo: prospecção (o que era do Josué) e o funil inteiro
   calebe: ["triagem_lista", "ver_tarefa", "buscar_empresas", "ver_leads_gerados", "analisar_site", "consultar_cnpj", "adicionar_ao_funil", "ver_funil", "mover_lead", "anotar_no_lead", "atualizar_lead", "passar_para_jonathan"],
 };
 const ETAPAS_SDR = ["novo", "abordado", "followup", "respondeu", "qualificando", "qualificado"];
@@ -19,7 +19,7 @@ const NOME_ETAPA: Record<string, string> = {
   novo: "Novo lead", abordado: "1ª mensagem enviada", followup: "Em follow-up", respondeu: "Respondeu",
   qualificando: "Em qualificação", qualificado: "Qualificado", reuniao: "Reunião marcada", descartado: "Descartado",
 };
-const NOME: Record<string, string> = { josue: "Josué", calebe: "Johnny", camila: "Camila", jonathan: "Jonathan", descartado: "Descartados" };
+const NOME: Record<string, string> = { josue: "Josué", calebe: "Vanessa", camila: "Camila", jonathan: "Jonathan", descartado: "Descartados" };
 
 const db = (caminho: string, o: RequestInit = {}) =>
   fetch(`${URL_SB}/rest/v1/${caminho}`, { ...o, headers: { apikey: CHAVE, Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json", ...(o.headers || {}) } });
@@ -114,9 +114,9 @@ async function buscarEmpresas(a: any) {
   lugares = lugares.slice(0, 50);
   if (!lugares.length) return { total: 0, aviso: "Não achei empresas com esse nicho nesse local nas bases de mapas gratuitas. Tente outro nome para o nicho." };
 
-  // grava na Geração de Leads do Hub, como uma busca feita pelo Johnny
+  // grava na Geração de Leads do Hub, como uma busca feita pela Vanessa
   const bid = "ia-" + Date.now().toString(36);
-  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Johnny)", local, total: lugares.length, paginas: 1 }) });
+  await db("pulse_leads_buscas", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ id: bid, termo: termo + " (Vanessa)", local, total: lugares.length, paginas: 1 }) });
   const expira = new Date(Date.now() + 30 * 864e5).toISOString();
   await db("pulse_leads", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(lugares.map((l: any) => ({ id: l.id, busca_id: bid, data: { ...l, buscadoPor: "calebe" }, expira_em: expira }))) });
@@ -249,7 +249,7 @@ async function entregarAoSdr(a: any, quem = "josue") {
     leadGeradoId: a.lead_id || null, criadoEm: agora, etapaDesde: agora,
     historico: quem === "josue" ? [{ dono: "josue", etapa: "pronto", em: agora - 1 }, { dono: sdr, etapa: "novo", em: agora }] : [{ dono: sdr, etapa: "novo", em: agora }],
     atividades: quem === "josue"
-      ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "ao Johnny"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
+      ? [{ texto: `Josué entregou o lead ${sdr === "camila" ? "à Camila" : "à Vanessa"}`, em: agora }, { texto: `Josué analisou e deu nota ${a.nota ?? "–"}/10`, em: agora - 1 }]
       : [{ texto: `${NOME[quem]} encontrou, analisou e deu nota ${a.nota ?? "–"}/10${a.extra ? ` · ${curto(a.extra, 120)}` : ""}`, em: agora }],
   };
   await salvarAg(l);

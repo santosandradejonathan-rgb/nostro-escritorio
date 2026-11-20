@@ -10,7 +10,7 @@ const ORIGENS = [
 // voz de cada agente (dá para trocar sem mexer no código com o segredo VOZES_AGENTES em JSON)
 const PADRAO: Record<string, { voz: string; ritmo: string; tom: string }> = {
   josue: { voz: "pt-BR-AntonioNeural", ritmo: "+14%", tom: "-2%" },
-  calebe: { voz: "pt-BR-MacerioMultilingualNeural", ritmo: "+12%", tom: "+0%" },
+  calebe: { voz: "pt-BR-ThalitaMultilingualNeural", ritmo: "+10%", tom: "+0%" },
   camila: { voz: "pt-BR-ThalitaNeural", ritmo: "+15%", tom: "+0%" },
   fernanda: { voz: "pt-BR-FranciscaNeural", ritmo: "+12%", tom: "+0%" },
 };
