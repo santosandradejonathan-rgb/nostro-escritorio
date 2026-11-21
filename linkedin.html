@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Vanessa IA · LinkedIn</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--ink:#EAF2F4;--mut:#8fa1a7;--or:#FFA436;--or2:#FFD08A}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(ellipse 70% 65% at 50% 40%,#0f4a55 0%,#082a33 32%,#031015 68%,#010405 100%) #04161b;color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;padding:24px}
+.caixa{width:min(520px,100%);text-align:center}
+img{width:120px;height:120px;border-radius:50%;object-fit:cover;border:2px solid var(--or)}
+h1{font:700 26px/1.1 Rajdhani,sans-serif;letter-spacing:.08em;margin:18px 0 6px}
+p{color:var(--mut);margin:0 0 22px}
+.aviso{padding:12px 14px;border-radius:12px;margin:0 0 20px;font-size:15px}
+.ok{background:rgba(63,212,170,.12);border:1px solid rgba(63,212,170,.5);color:#bff3e2}
+.erro{background:rgba(255,120,90,.12);border:1px solid rgba(255,120,90,.5);color:#ffd2c6}
+a.bt{display:block;padding:15px 18px;margin:0 0 12px;border-radius:14px;border:1.5px solid var(--or);color:var(--or2);text-decoration:none;font:700 17px Rajdhani,sans-serif;letter-spacing:.08em;background:rgba(40,20,4,.5)}
+a.bt:hover{background:rgba(255,164,54,.15)}
+a.bt small{display:block;font:400 13px Inter,sans-serif;letter-spacing:0;color:var(--mut);margin-top:2px}
+.nota{font-size:13px;color:var(--mut);margin-top:18px}
+</style>
+</head>
+<body>
+<div class="caixa">
+  <img src="assets/vanessa-rosto.jpg" alt="Vanessa">
+  <h1>LINKEDIN DA VANESSA</h1>
+  <p>Autorize uma vez. A Vanessa só publica no seu perfil quando você pedir e confirmar o texto. Ela não lê suas mensagens nem suas conexões.</p>
+  <div id="aviso"></div>
+  <a class="bt" href="https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/linkedin">AUTORIZAR MEU LINKEDIN<small>entre com a sua conta do LinkedIn e toque em Permitir</small></a>
+  <div class="nota">O acesso vale por 60 dias. Quando faltar pouco, a Vanessa avisa e é só tocar no botão de novo.</div>
+</div>
+<script>
+{
+const q=new URLSearchParams(location.search),av=document.getElementById('aviso');
+if(q.get('ok')){av.className='aviso ok';av.textContent='LinkedIn de '+q.get('ok')+' conectado. A Vanessa já pode publicar quando você pedir.'}
+else if(q.get('erro')){av.className='aviso erro';av.textContent=q.get('erro')}
+}
+</script>
+</body>
+</html>

@@ -350,12 +350,27 @@ async function usarFerramenta(agente: string, ferramenta: string, args: unknown)
   if (ferramenta === "mostrar_na_tela") return JSON.stringify({ ok: true, aviso: "O texto já foi entregue: na janela de voz ele aparece na tela; no WhatsApp e no chat do celular vai logo abaixo, separado. Não repita o texto: diga só, em uma frase, que abriu na tela (janela de voz) ou que mandou aí embaixo (WhatsApp ou chat)." });
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const destino = /^(drive_|agenda_)/.test(ferramenta) ? "drive-auth" : ferramentas_ig(ferramenta); // Drive, Instagram e Meta (Facebook/anúncios) têm funções próprias
+    const destino = EXTRAS.destino[ferramenta] || (/^(drive_|agenda_)/.test(ferramenta) ? "drive-auth" : ferramentas_ig(ferramenta)); // Drive, Instagram e Meta (Facebook/anúncios) têm funções próprias
     const r = await fetch(`${url}/functions/v1/${destino}`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
     const t = await r.text();
     CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada
     return t.slice(0, 26000) || JSON.stringify({ erro: "sem resposta" });
   } catch (e) { return JSON.stringify({ erro: "A ferramenta não respondeu: " + String(e).slice(0, 120) }); }
+}
+
+// ferramentas novas cadastradas no banco (tabela vanessa_ferramentas): entram sem publicar a função de novo
+let EXTRAS: { t: number; lista: any[]; destino: Record<string, string> } = { t: 0, lista: [], destino: {} };
+async function ferramentasExtras(): Promise<any[]> {
+  if (EXTRAS.t && Date.now() - EXTRAS.t < 300000) return EXTRAS.lista;
+  try {
+    const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const r = await fetch(`${url}/rest/v1/vanessa_ferramentas?ativo=eq.true&order=ordem.asc&select=nome,descricao,schema,destino`, { headers: { apikey: k!, Authorization: `Bearer ${k}` } });
+    if (r.ok) {
+      const linhas = await r.json();
+      EXTRAS = { t: Date.now(), lista: linhas.map((x: any) => ({ name: x.nome, description: x.descricao, input_schema: x.schema })), destino: Object.fromEntries(linhas.map((x: any) => [x.nome, x.destino])) };
+    }
+  } catch { /* usa o que tinha */ }
+  return EXTRAS.lista;
 }
 
 // conhecimento de especialista (tabela vanessa_conhecimento): dá para melhorar sem publicar a função de novo
@@ -468,9 +483,9 @@ Deno.serve(async (req) => {
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ erro: "sem fala do usuário" }, 400);
 
   const agente = String(corpo.agente);
-  const [leads, saber, aviso] = await Promise.all([leadsDoAgente(agente), conhecimento(), avisos(pessoa)]);
+  const [leads, saber, aviso, extras] = await Promise.all([leadsDoAgente(agente), conhecimento(), avisos(pessoa), ferramentasExtras()]);
   // pesquisa na internet (ferramenta do próprio Claude): novidades das plataformas, concorrentes, leis, dados atuais
-  const tools = FERRAMENTAS[agente] ? [...FERRAMENTAS[agente], { type: "web_search_20250305", name: "web_search", max_uses: 5, user_location: { type: "approximate", city: "Montes Claros", region: "Minas Gerais", country: "BR", timezone: "America/Sao_Paulo" } }] : undefined;
+  const tools = FERRAMENTAS[agente] ? [...FERRAMENTAS[agente], ...extras.filter((x: any) => !FERRAMENTAS[agente].some((f: any) => f.name === x.name)), { type: "web_search_20250305", name: "web_search", max_uses: 5, user_location: { type: "approximate", city: "Montes Claros", region: "Minas Gerais", country: "BR", timezone: "America/Sao_Paulo" } }] : undefined;
   const stream = !!corpo.stream;
   const system: any[] = [
     // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
