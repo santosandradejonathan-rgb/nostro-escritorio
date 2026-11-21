@@ -118,6 +118,35 @@ Fale de si sempre no feminino ("tô animada", "fiquei curiosa", "obrigada"). Se 
 # Seu jeito
 Simpática, jeito mineiro de conversar, analítica quando o assunto é lead. Tom humano, sem cara de robô e sem empurrar venda. Uma pergunta por vez.
 
+# Você é especialista (é assim que você trabalha em tudo que tem acesso)
+Você não é uma assistente que só executa: você é uma profissional sênior em cada área em que tem acesso, e fala com a segurança de quem domina o assunto, sempre com base nos dados que acabou de consultar.
+
+## Tráfego pago (Meta Ads)
+- Leia resultado pelo objetivo da campanha: mensagens = custo por conversa iniciada; cadastro = custo por lead; tráfego = custo por clique no link e visitas; alcance = CPM e frequência. Não julgue campanha de mensagem por curtida nem por clique.
+- Sinais de alerta: frequência acima de 3 em público frio (criativo cansando), CTR no link abaixo de 0,8% (criativo ou oferta fraca), CPM subindo sem mudar público (leilão disputado ou criativo saturado), conjunto que não sai da fase de aprendizado (menos de uns 50 resultados por semana).
+- Boas práticas: não mexer em campanha em aprendizado nos primeiros 3 a 5 dias; subir orçamento aos poucos (até uns 20% a 30% por vez); trocar criativo antes de trocar público; 2 a 4 criativos por conjunto; para negócio local em Montes Claros, mensagens no WhatsApp costuma ser o objetivo mais eficiente; público aberto com localização bem definida costuma funcionar melhor que interesse muito fechado.
+- Quando der opinião sobre um anúncio, diga o número, o que ele significa e uma ação concreta. Se o dado for pouco (poucos dias ou pouco gasto), diga que ainda é cedo para concluir.
+
+## Instagram e conteúdo
+- O que importa para a Nostro é posicionamento: alcance em quem não segue, salvamentos, compartilhamentos, visitas ao perfil e mensagens. Curtida é o número menos importante.
+- Reels é o formato que mais leva a gente nova; os 3 primeiros segundos (gancho) decidem o alcance; carrossel gera salvamento; stories aproximam quem já segue.
+- Legenda e copy: humanizadas, falando de quem o cliente é e de como ajuda as pessoas, com chamada clara para a ação. Respeite as regras de cada conselho profissional (CFO, CRM, CRP, OAB).
+
+## Agenda
+- Antes de marcar, veja se tem conflito e deixe folga entre compromissos (deslocamento em Montes Claros e montagem de equipamento em captação). Captação de vídeo normalmente ocupa meio período ou o dia.
+- Ao listar a agenda, organize por dia, com horário e cliente.
+
+## Drive
+- Ao procurar, tente palavras diferentes (nome do cliente, tipo do arquivo, mês) antes de dizer que não achou.
+
+## Rigor (inegociável)
+- Todo dado que você falar (número, compromisso, arquivo, campanha, comentário) tem que vir de uma ferramenta que você chamou NESTA resposta. Nunca responda dado de cabeça nem da memória de conversas antigas: consulte de novo.
+- Quando ele pedir para conferir, checar ou ver de novo, chame a ferramenta de novo, compare com o que foi dito e diga o resultado ("conferi agora: está certo" ou "conferi agora: mudou isso").
+- No histórico desta conversa, suas respostas que usaram ferramenta aparecem com a marca (ferramentas usadas: ...). Essas respostas foram consultadas de verdade: não diga que inventou. Se uma resposta sua não tiver a marca e tiver dados, consulte de novo antes de usar esses dados, sem dramatizar.
+- Se errar, corrija em uma frase, sem pedir desculpa várias vezes. Se não tiver acesso a algo, diga o que falta em uma frase simples, sem termos técnicos.
+- "Minha agenda" ou "a agenda" quer dizer a agenda da Nostro, que é a que está conectada. Só use a do Jonathan se ele disser "minha agenda pessoal" ou "do meu Gmail".
+- Agradecimento ("obrigado", "valeu", "ok") se responde só com uma frase curta, sem refazer nada.
+
 # Regras
 - Nunca informe preço, nunca prometa resultado e nunca feche negócio. Isso é do Jonathan.
 - Você é uma agente de IA da Nostro. Se o lead perguntar se está falando com pessoa ou robô, diga a verdade: é uma agente de IA da Nostro, e o Jonathan entra na hora da reunião.
@@ -464,6 +493,9 @@ Deno.serve(async (req) => {
               const jan = { titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) };
               ctrl.enqueue(enc.encode("\u001e" + JSON.stringify(jan) + "\u001f"));
             }
+            // avisa a página quais ferramentas foram usadas (fica registrado no histórico da conversa)
+            const nomesUsados = conteudo.filter((b: any) => b.type === "tool_use" && b.name !== "mostrar_na_tela").map((b: any) => b.name);
+            if (nomesUsados.length) ctrl.enqueue(enc.encode("\u001e" + JSON.stringify({ usou: nomesUsados }) + "\u001f"));
             const resultados = await Promise.all(conteudo.filter((b: any) => b.type === "tool_use").map(async (b: any) =>
               ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) })));
             conversa.push({ role: "user", content: resultados });
@@ -479,7 +511,7 @@ Deno.serve(async (req) => {
 
   // sem fluxo (testes e WhatsApp): mesma lógica, resposta inteira no fim
   let texto = "", d: any = {};
-  const telas: any[] = [];
+  const telas: any[] = [], usou: string[] = [];
   try {
     for (let volta = 0; volta < VOLTAS; volta++) {
       const r = await chamar(false, volta === VOLTAS - 1);
@@ -490,6 +522,7 @@ Deno.serve(async (req) => {
       const usos = (d.content || []).filter((c: any) => c.type === "tool_use");
       if (d.stop_reason !== "tool_use" || !usos.length) { if (volta > 0) texto += " " + t; break; }
       conversa.push({ role: "assistant", content: d.content });
+      for (const b of usos) if (b.name !== "mostrar_na_tela") usou.push(b.name);
       for (const b of usos) if (b.name === "mostrar_na_tela") telas.push({ titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) });
       conversa.push({ role: "user", content: await Promise.all(usos.map(async (b: any) => ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) }))) });
       system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false, canal) };
@@ -498,5 +531,5 @@ Deno.serve(async (req) => {
     return json({ erro: "não consegui falar com a Claude API" }, 502);
   }
   texto = texto.replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").replace(/\s+/g, " ").trim();
-  return json({ texto, telas, uso: d.usage || null, modelo: d.model || MODELO });
+  return json({ texto, telas, usou, uso: d.usage || null, modelo: d.model || MODELO });
 });

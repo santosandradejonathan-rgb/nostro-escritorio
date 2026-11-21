@@ -301,17 +301,17 @@ async function enviar(texto){
   try{const r=await fetch(FN_AGENTE,{method:'POST',signal:meu.signal,headers:{'Content-Type':'application/json'},
       body:JSON.stringify({agente:AG,interlocutor:'Jonathan',pessoa:PESSOA,inicio:sess.inicio,sala:'janela da Vanessa no Hub',mensagens:ms.slice(-20),stream:true})});
     if(!r.ok||!r.body)throw new Error('sem resposta');
-    const rd=r.body.getReader(),dec=new TextDecoder();let quadro=null;const mostradas=[];
+    const rd=r.body.getReader(),dec=new TextDecoder();let quadro=null;const mostradas=[],usadas=[];
     for(;;){const {value,done}=await rd.read();if(ctl!==meu)return;if(done)break;let t='';
       // separa a fala dos quadros de janela (entre \u001e e \u001f)
       for(const ch of dec.decode(value,{stream:true})){
-        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);abreJanela(j);mostradas.push(j)}catch(e){}quadro=null}else quadro+=ch}
+        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);if(j.usou)usadas.push(...j.usou);else{abreJanela(j);mostradas.push(j)}}catch(e){}quadro=null}else quadro+=ch}
         else if(ch==='\u001e')quadro='';else t+=ch}
       total+=t;pend+=t;
       let m;while((m=pend.match(/^([\s\S]*?[.!?…])\s+/))&&m[1].trim().length>=8){poeNaFila(f,m[1]);pend=pend.slice(m[0].length)}}
     ctl=null;total=total.trim();if(!total&&!mostradas.length)throw new Error('vazio');
     if(pend.trim())poeNaFila(f,pend);liga(ferramentasDe(texto+' '+total));
-    const registro=total+mostradas.map(j=>'\n\n(Mostrei na tela, na janela "'+j.titulo+'":)\n'+j.texto).join('');
+    const registro=total+(usadas.length?'\n(ferramentas usadas: '+[...new Set(usadas)].join(', ')+')':'')+mostradas.map(j=>'\n\n(Mostrei na tela, na janela "'+j.titulo+'":)\n'+j.texto).join('');
     ms.push({role:'assistant',content:registro});memAdd('a',registro);f.acabou=true;if(!f.tocando&&!f.itens.length)terminouFala(f)}
   catch(e){if(e.name==='AbortError')return;ctl=null;fila=null;fase('','NÃO CONSEGUI RESPONDER. TENTE DE NOVO');setTimeout(()=>{if(conversa)ouvir()},2200)}}
 

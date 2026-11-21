@@ -191,17 +191,17 @@ async function manda(texto,au){
   else balao('u',texto,agora);
   H.msgs.push(msg);salva();memAdd('u',au?'(áudio) '+texto:texto);
   const desde=Date.parse(H.ini);
-  const enviar=H.msgs.filter(m=>m.t>=desde).slice(-20).map(m=>({role:m.role,content:m.role==='user'?m.content:(m.fala||'')+(m.telas||[]).map(j=>'\n\n(Mandei aqui no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join('')}));
+  const enviar=H.msgs.filter(m=>m.t>=desde).slice(-20).map(m=>({role:m.role,content:m.role==='user'?m.content:(m.fala||'')+(m.usou&&m.usou.length?'\n(ferramentas usadas: '+m.usou.join(', ')+')':'')+(m.telas||[]).map(j=>'\n\n(Mandei aqui no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join('')}));
   status('DIGITANDO...',true);
   const bal=document.createElement('div');bal.className='m a';bal.innerHTML='<span class="dig"><b></b><b></b><b></b></span>';lista.appendChild(bal);rola();
-  let fala='',quadro=null;const telas=[],cards=[];
+  let fala='',quadro=null;const telas=[],cards=[],usadas=[];
   try{
     const r=await fetch(FN_AGENTE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:AG,canal:'chat',interlocutor:'Jonathan',pessoa:PESSOA,inicio:H.ini,sala:'chat no celular',mensagens:enviar,stream:true})});
     if(!r.ok||!r.body)throw new Error('sem resposta');
     const rd=r.body.getReader(),dec=new TextDecoder();
     for(;;){const {value,done}=await rd.read();if(done)break;let t='';
       for(const ch of dec.decode(value,{stream:true})){
-        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);telas.push(j);cards.push(cartao(j));lista.appendChild(bal);rola()}catch(e){}quadro=null}else quadro+=ch}
+        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);if(j.usou)usadas.push(...j.usou);else{telas.push(j);cards.push(cartao(j));lista.appendChild(bal);rola()}}catch(e){}quadro=null}else quadro+=ch}
         else if(ch==='\u001e')quadro='';else t+=ch}
       if(t){fala+=t;if(fala.trim()){bal.innerHTML=linkifica(fala.trim());rola()}}}
     fala=fala.replace(/[ \t]+\n/g,'\n').trim();
@@ -209,8 +209,8 @@ async function manda(texto,au){
     const fim=Date.now();
     if(fala)bal.innerHTML=linkifica(fala)+'<span class="h">'+hora(fim)+'</span>';else bal.remove();
     if(fala&&cards.length)lista.insertBefore(bal,cards[0]); // a frase vem antes dos cartões, como no histórico
-    H.msgs.push({role:'assistant',fala,telas,t:fim});salva();
-    memAdd('a',fala+telas.map(j=>'\n\n(Mandei no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join(''));
+    const usou=[...new Set(usadas)];H.msgs.push({role:'assistant',fala,telas,usou,t:fim});salva();
+    memAdd('a',fala+(usou.length?'\n(ferramentas usadas: '+usou.join(', ')+')':'')+telas.map(j=>'\n\n(Mandei no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join(''));
   }catch(e){
     bal.classList.add('err');bal.textContent='Não consegui responder agora. Confere a internet e tenta de novo.';
     H.msgs.pop();salva();if(!au)txt.value=texto;
