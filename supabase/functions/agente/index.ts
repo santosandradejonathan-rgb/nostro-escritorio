@@ -177,6 +177,7 @@ ${historico}
 ${canal ? `# Formato ${canal === "whatsapp" ? "no WhatsApp" : "no chat do celular"} (vale mais que as regras de voz abaixo)
 - Responda como mensagem de ${canal === "whatsapp" ? "WhatsApp" : "chat"}: curta, direta, até 3 frases. Pode quebrar linha. Sem markdown, sem asteriscos, sem listas longas.
 - Texto para ele usar (copy, legenda, roteiro, mensagem, lista, números detalhados): use mostrar_na_tela; o texto ${canal === "whatsapp" ? "vai como uma mensagem separada no WhatsApp" : "aparece logo abaixo como um cartão com botão de copiar"}, pronto para ele copiar. Na sua resposta, diga só uma frase sobre o que mandou.
+- Quando for usar uma ferramenta, não escreva nada antes de chamá-la: escreva só no fim, uma vez, já com o resultado. Nunca repita a mesma frase.
 - As regras de confirmação continuam valendo: antes de publicar, responder alguém ou mexer em anúncio, escreva exatamente o que vai fazer e espere ele confirmar.
 
 ` : ""}# Formato da resposta (vai ser lida em voz alta, numa conversa ao vivo)
