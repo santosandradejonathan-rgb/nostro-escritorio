@@ -144,10 +144,10 @@ Simpática, jeito mineiro de conversar, analítica quando o assunto é lead. Tom
 - Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
 };
 
-const COMUM = (interlocutor: string, sala: string, historico: string, agora: string, primeira: boolean) => `
+const COMUM = (interlocutor: string, sala: string, historico: string, agora: string, primeira: boolean, canal = "") => `
 
 # Onde você está
-Você conversa por voz numa janela no computador da Nostro (${sala}).
+${canal === "whatsapp" ? "Você está conversando por mensagem no WhatsApp com quem está falando, pelo celular. Ele pode estar na rua, sem computador. Quando ele manda áudio, chega aqui já transcrito." : canal === "chat" ? "Você está conversando por mensagem num chat no celular (o app da Vanessa), com quem está falando. Ele pode estar na rua, sem computador. Quando ele usa o microfone, a fala chega aqui já transcrita." : `Você conversa por voz numa janela no computador da Nostro (${sala}).`}
 Agora quem está falando com você é ${interlocutor}. Se não for o Jonathan, trate como alguém do time da Nostro, por exemplo a Stephanie, sócia dele.
 Agora são ${agora} (horário de Brasília). Hoje é ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })} (ano-mês-dia).
 
@@ -174,7 +174,12 @@ ${historico}
 - Fale como colega de trabalho: frases curtas, espontâneas, com opinião própria. Pode concordar, discordar, comentar o dia e fazer uma piada leve quando couber.
 - Se não souber algo, diga que não sabe. Se a pessoa se despedir ou sair, responda só com uma despedida curta.
 
-# Formato da resposta (vai ser lida em voz alta, numa conversa ao vivo)
+${canal ? `# Formato ${canal === "whatsapp" ? "no WhatsApp" : "no chat do celular"} (vale mais que as regras de voz abaixo)
+- Responda como mensagem de ${canal === "whatsapp" ? "WhatsApp" : "chat"}: curta, direta, até 3 frases. Pode quebrar linha. Sem markdown, sem asteriscos, sem listas longas.
+- Texto para ele usar (copy, legenda, roteiro, mensagem, lista, números detalhados): use mostrar_na_tela; o texto ${canal === "whatsapp" ? "vai como uma mensagem separada no WhatsApp" : "aparece logo abaixo como um cartão com botão de copiar"}, pronto para ele copiar. Na sua resposta, diga só uma frase sobre o que mandou.
+- As regras de confirmação continuam valendo: antes de publicar, responder alguém ou mexer em anúncio, escreva exatamente o que vai fazer e espere ele confirmar.
+
+` : ""}# Formato da resposta (vai ser lida em voz alta, numa conversa ao vivo)
 - Português do Brasil falado, do jeito que se fala no dia a dia de Minas: "tô", "pra", "né", "tá", "a gente", "olha", "então". Sem exagerar nem forçar sotaque.
 - Pontual: no máximo 2 frases. Responda primeiro exatamente o que foi perguntado (o número, o nome, o sim ou não) e pare. Só se estenda se pedirem detalhe.
 - Comece pela resposta, sem rodeio e sem repetir a pergunta. Frases curtas, uma ideia por frase.
@@ -279,7 +284,7 @@ const FERRAMENTAS: Record<string, any[]> = {
 };
 const ferramentas_ig = (f: string) => (f.startsWith("ig_") ? "instagram" : /^(fb_|ads_|meta_)/.test(f) ? "meta" : "ferramentas");
 async function usarFerramenta(agente: string, ferramenta: string, args: unknown): Promise<string> {
-  if (ferramenta === "mostrar_na_tela") return JSON.stringify({ ok: true, aviso: "A janela já está aberta na tela do Jonathan. Não leia o texto em voz alta: diga só, em uma frase, que abriu na tela." });
+  if (ferramenta === "mostrar_na_tela") return JSON.stringify({ ok: true, aviso: "O texto já foi entregue: na janela de voz ele aparece na tela; no WhatsApp e no chat do celular vai logo abaixo, separado. Não repita o texto: diga só, em uma frase, que abriu na tela (janela de voz) ou que mandou aí embaixo (WhatsApp ou chat)." });
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const destino = ferramenta.startsWith("drive_") ? "drive-auth" : ferramentas_ig(ferramenta); // Drive, Instagram e Meta (Facebook/anúncios) têm funções próprias
@@ -331,7 +336,8 @@ Deno.serve(async (req) => {
   const json = (b: unknown, s = 200) =>
     new Response(JSON.stringify(b), { status: s, headers: { ...h, "Content-Type": "application/json" } });
   if (req.method !== "POST") return json({ erro: "método" }, 405);
-  if (!ok) return json({ erro: "origem não permitida" }, 403);
+  const interno = !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") && req.headers.get("x-segredo") === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); // função do WhatsApp
+  if (!ok && !interno) return json({ erro: "origem não permitida" }, 403);
 
   // aceita o segredo mesmo se vier colado junto com texto (pega só a chave sk-ant-...)
   const bruto = Deno.env.get("ANTHROPIC_API_KEY") || "";
@@ -345,6 +351,7 @@ Deno.serve(async (req) => {
 
   const interlocutor = String(corpo.interlocutor || "Jonathan").slice(0, 60);
   const sala = String(corpo.sala || "Sala Comercial").slice(0, 60);
+  const canal = corpo.canal === "whatsapp" ? "whatsapp" : corpo.canal === "chat" ? "chat" : "";
   const pessoa = String(corpo.pessoa || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 40);
   const doBanco = await memoriaDe(String(corpo.agente || ""), pessoa, String(corpo.inicio || ""));
   const historico = (doBanco || String(corpo.historico || "") || "Nenhuma conversa anterior. É a primeira vez que vocês conversam.").slice(-12000);
@@ -354,7 +361,7 @@ Deno.serve(async (req) => {
   const msgs: { role: string; content: string }[] = [];
   for (const m of (Array.isArray(corpo.mensagens) ? corpo.mensagens : []).slice(-20)) {
     const role = m.role === "assistant" ? "assistant" : "user";
-    const content = String(m.content || "").trim().slice(0, 1500);
+    const content = String(m.content || "").trim().slice(0, 4000);
     if (!content) continue;
     if (msgs.length && msgs[msgs.length - 1].role === role) msgs[msgs.length - 1].content += "\n" + content;
     else msgs.push({ role, content });
@@ -369,7 +376,7 @@ Deno.serve(async (req) => {
   const system: any[] = [
     // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
     { type: "text", text: base + leads, cache_control: { type: "ephemeral" } },
-    { type: "text", text: COMUM(interlocutor, sala, historico, agora, !msgs.some((m) => m.role === "assistant")) },
+    { type: "text", text: COMUM(interlocutor, sala, historico, agora, !msgs.some((m) => m.role === "assistant"), canal) },
   ];
   const conversa: any[] = msgs.map((m) => ({ ...m }));
   const chamar = (comFluxo: boolean, ultima: boolean) => fetch("https://api.anthropic.com/v1/messages", {
@@ -435,7 +442,7 @@ Deno.serve(async (req) => {
             const resultados = await Promise.all(conteudo.filter((b: any) => b.type === "tool_use").map(async (b: any) =>
               ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) })));
             conversa.push({ role: "user", content: resultados });
-            system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) }; // já falou: não repete o nome
+            system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false, canal) }; // já falou: não repete o nome
             if (falou) manda(" ");
           }
         } catch { /* conexão caiu */ }
@@ -445,7 +452,7 @@ Deno.serve(async (req) => {
     return new Response(saida, { headers: { ...h, "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   }
 
-  // sem fluxo (testes): mesma lógica, resposta inteira no fim
+  // sem fluxo (testes e WhatsApp): mesma lógica, resposta inteira no fim
   let texto = "", d: any = {};
   const telas: any[] = [];
   try {
@@ -460,7 +467,7 @@ Deno.serve(async (req) => {
       conversa.push({ role: "assistant", content: d.content });
       for (const b of usos) if (b.name === "mostrar_na_tela") telas.push({ titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) });
       conversa.push({ role: "user", content: await Promise.all(usos.map(async (b: any) => ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) }))) });
-      system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) };
+      system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false, canal) };
     }
   } catch (_e) {
     return json({ erro: "não consegui falar com a Claude API" }, 502);

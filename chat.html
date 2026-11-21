@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>Vanessa IA</title>
+<meta name="theme-color" content="#04161b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vanessa IA">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icone-180.png">
+<link rel="icon" type="image/png" href="assets/icone-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--ink:#EAF2F4;--mut:#8fa1a7;--or:#FFA436;--or2:#FFD08A;--cy:#3fd4e6;--bg:#04161b;--bg2:#0a2229;--linha:rgba(255,164,54,.22)}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+  background-image:radial-gradient(120% 60% at 50% -10%,rgba(255,164,54,.10),transparent 60%),radial-gradient(90% 50% at 50% 110%,rgba(63,212,230,.06),transparent 60%)}
+header{flex:none;display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;border-bottom:1px solid var(--linha);background:rgba(4,22,27,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.av{position:relative;width:44px;height:44px;flex:none}
+.av img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:1.5px solid var(--or);box-shadow:0 0 14px rgba(255,164,54,.35)}
+.av i{position:absolute;right:0;bottom:1px;width:11px;height:11px;border-radius:50%;background:var(--cy);border:2px solid var(--bg);animation:pisca 2.4s infinite}
+.nm{font:700 21px/1 Rajdhani,sans-serif;letter-spacing:.08em}
+.st{font:600 12px/1 Rajdhani,sans-serif;letter-spacing:.12em;color:var(--mut);margin-top:5px;text-transform:uppercase}
+.st.ativo{color:var(--or2)}
+#nova{margin-left:auto;background:none;border:1px solid var(--linha);color:var(--or2);font:600 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:8px 11px;border-radius:9px}
+#lista{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
+.dia{align-self:center;font:600 11px Rajdhani,sans-serif;letter-spacing:.14em;color:var(--mut);padding:4px 10px;border:1px solid rgba(143,161,167,.2);border-radius:20px;margin:6px 0}
+.m{max-width:84%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;font-size:15.5px;line-height:1.45;animation:entra .22s ease-out}
+.m.u{align-self:flex-end;background:linear-gradient(160deg,#FFB24E,#E88E22);color:#1b1206;border-bottom-right-radius:5px}
+.m.a{align-self:flex-start;background:var(--bg2);border:1px solid rgba(255,164,54,.14);border-bottom-left-radius:5px}
+.m.err{border-color:rgba(255,110,90,.5);color:#ffb3a6}
+.m a{color:var(--cy)} .m.u a{color:#3a1f00}
+.h{display:block;font:600 10.5px Rajdhani,sans-serif;letter-spacing:.1em;opacity:.55;margin-top:3px;text-align:right}
+.dig{display:inline-flex;gap:4px;padding:4px 2px}
+.dig b{width:7px;height:7px;border-radius:50%;background:var(--or2);opacity:.4;animation:dig 1.1s infinite}
+.dig b:nth-child(2){animation-delay:.15s}.dig b:nth-child(3){animation-delay:.3s}
+.card{align-self:stretch;margin:2px 0 2px;border:1px solid var(--linha);border-radius:14px;background:linear-gradient(180deg,rgba(255,164,54,.07),rgba(10,34,41,.9) 70px);overflow:hidden;animation:entra .25s ease-out;position:relative}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(var(--or),transparent)}
+.ct{display:flex;align-items:center;gap:8px;padding:11px 12px 9px 15px;border-bottom:1px solid rgba(255,164,54,.12)}
+.ct b{font:700 14px/1.15 Rajdhani,sans-serif;letter-spacing:.1em;color:var(--or2);flex:1}
+.cp{flex:none;background:rgba(255,164,54,.12);border:1px solid rgba(255,164,54,.4);color:var(--or2);font:700 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:7px 12px;border-radius:8px}
+.cp.ok{background:var(--or);color:#1b1206}
+.cb{padding:12px 14px 14px 15px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;font-size:15px;line-height:1.55;max-height:60vh;overflow-y:auto}
+.cb.aberto{max-height:none}
+.mais{display:block;width:100%;background:none;border:0;border-top:1px solid rgba(255,164,54,.12);color:var(--mut);font:600 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:9px}
+footer{flex:none;padding:8px 10px calc(env(safe-area-inset-bottom) + 10px);background:rgba(4,22,27,.92);border-top:1px solid var(--linha)}
+#aviso{font:600 12px Rajdhani,sans-serif;letter-spacing:.1em;color:var(--or2);text-align:center;min-height:0;transition:.2s}
+#aviso:not(:empty){padding:2px 0 7px}
+.barra{display:flex;align-items:flex-end;gap:8px}
+#txt{flex:1;resize:none;max-height:140px;min-height:44px;padding:11px 14px;border-radius:22px;border:1px solid rgba(255,164,54,.3);background:#061d23;color:var(--ink);font:16px/1.35 Inter,system-ui,sans-serif;outline:none}
+#txt:focus{border-color:var(--or)}
+#txt::placeholder{color:#5d7279}
+.bt{flex:none;width:44px;height:44px;border-radius:50%;border:0;display:grid;place-items:center}
+.bt svg{width:21px;height:21px}
+#mic{background:#0d2a31;border:1px solid rgba(255,164,54,.35);color:var(--or2)}
+#mic.on{background:#e5484d;border-color:#e5484d;color:#fff;animation:pulso 1.2s infinite}
+#env{background:var(--or);color:#1b1206}
+#env:disabled{opacity:.35}
+.vazio{margin:auto;text-align:center;color:var(--mut);padding:30px 20px}
+.vazio img{width:96px;height:96px;border-radius:50%;border:1.5px solid var(--or);box-shadow:0 0 30px rgba(255,164,54,.3);margin-bottom:14px}
+.vazio b{display:block;font:700 22px Rajdhani,sans-serif;letter-spacing:.1em;color:var(--ink)}
+.vazio span{font-size:14px}
+@keyframes pisca{50%{opacity:.4}}
+@keyframes dig{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}}
+@keyframes pulso{0%{box-shadow:0 0 0 0 rgba(229,72,77,.6)}100%{box-shadow:0 0 0 12px rgba(229,72,77,0)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="av"><img src="assets/vanessa-rosto.jpg" alt=""><i></i></div>
+  <div><div class="nm">VANESSA IA</div><div class="st" id="st">ONLINE</div></div>
+  <button id="nova" type="button">NOVA CONVERSA</button>
+</header>
+<div id="lista"></div>
+<footer>
+  <div id="aviso"></div>
+  <div class="barra">
+    <button class="bt" id="mic" type="button" aria-label="Falar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    <textarea id="txt" rows="1" placeholder="Fala com a Vanessa..." enterkeyhint="send"></textarea>
+    <button class="bt" id="env" type="button" aria-label="Enviar" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12 2-12 2z"/></svg></button>
+  </div>
+</footer>
+<script>
+const SUPA='https://isfyxyoelqmncqxcrvlx.supabase.co',KEY='sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z';
+const FN_AGENTE=SUPA+'/functions/v1/agente',AG='calebe',PESSOA='jonathan';
+const lista=document.getElementById('lista'),txt=document.getElementById('txt'),env=document.getElementById('env'),mic=document.getElementById('mic'),st=document.getElementById('st'),aviso=document.getElementById('aviso');
+const GUARDA='vanessa-chat-v1',PAUSA=6*3600e3;
+let H={msgs:[],ini:null};try{H=JSON.parse(localStorage.getItem(GUARDA))||H}catch(e){}
+const salva=()=>{try{H.msgs=H.msgs.slice(-60);localStorage.setItem(GUARDA,JSON.stringify(H))}catch(e){}};
+let ocupado=false;
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const linkifica=s=>esc(s).replace(/https?:\/\/[^\s<]+/g,u=>'<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>');
+const hora=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const diaDe=t=>{const d=new Date(t),hj=new Date();const o=new Date(Date.now()-864e5);
+  if(d.toDateString()===hj.toDateString())return'HOJE';if(d.toDateString()===o.toDateString())return'ONTEM';
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})};
+const rola=()=>requestAnimationFrame(()=>{lista.scrollTop=lista.scrollHeight});
+function memAdd(quem,texto){texto=String(texto||'').trim();if(!texto)return;fetch(SUPA+'/rest/v1/escritorio_memoria',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({agente:AG,pessoa:PESSOA,quem,texto:('[Chat] '+texto).slice(0,1200)})}).catch(()=>{})}
+
+function balao(quem,texto,t){const d=document.createElement('div');d.className='m '+quem;d.innerHTML=linkifica(texto)+(t?'<span class="h">'+hora(t)+'</span>':'');lista.appendChild(d);return d}
+function cartao(j){
+  const c=document.createElement('div');c.className='card';
+  c.innerHTML='<div class="ct"><b></b><button class="cp" type="button">COPIAR</button></div><div class="cb"></div>';
+  c.querySelector('b').textContent=j.titulo||'VANESSA';c.querySelector('.cb').textContent=j.texto||'';
+  c.querySelector('.cp').onclick=e=>copia(j.texto||'',e.currentTarget);
+  lista.appendChild(c);
+  const cb=c.querySelector('.cb');requestAnimationFrame(()=>{if(cb.scrollHeight>cb.clientHeight+4){const m=document.createElement('button');m.className='mais';m.type='button';m.textContent='VER TUDO';m.onclick=()=>{cb.classList.add('aberto');m.remove()};c.appendChild(m)}});
+  return c}
+async function copia(t,b){let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);a.select();try{ok=document.execCommand('copy')}catch(_){}a.remove()}
+  if(ok){b.textContent='COPIADO';b.classList.add('ok');setTimeout(()=>{b.textContent='COPIAR';b.classList.remove('ok')},1800)}}
+function vazio(){lista.innerHTML='<div class="vazio"><img src="assets/vanessa-rosto.jpg" alt=""><b>VANESSA IA</b><span>Pede o que precisar: leads, Instagram, anúncios, Drive, uma copy.<br>Toque no microfone para falar.</span></div>'}
+function desenha(){lista.innerHTML='';if(!H.msgs.length)return vazio();let ult='',antT=0;
+  for(const m of H.msgs){const d=diaDe(m.t);if(d!==ult){const s=document.createElement('div');s.className='dia';s.textContent=d;lista.appendChild(s);ult=d}
+    if(m.role==='user')balao('u',m.content,m.t);else{if(m.fala)balao('a',m.fala,m.t);(m.telas||[]).forEach(cartao)}}
+  rola()}
+
+function ajusta(){txt.style.height='auto';txt.style.height=Math.min(140,txt.scrollHeight)+'px';env.disabled=ocupado||!txt.value.trim()}
+txt.addEventListener('input',ajusta);
+txt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!/Mobi|Android|iPhone/i.test(navigator.userAgent)){e.preventDefault();manda()}});
+env.onclick=()=>manda();
+document.getElementById('nova').onclick=()=>{if(ocupado)return;if(H.msgs.length&&!confirmaNova())return;H={msgs:[],ini:null};salva();desenha()};
+let tNova=0;function confirmaNova(){const b=document.getElementById('nova');if(Date.now()-tNova<2500){b.textContent='NOVA CONVERSA';return true}tNova=Date.now();b.textContent='TOQUE DE NOVO';setTimeout(()=>{b.textContent='NOVA CONVERSA'},2500);return false}
+
+async function manda(texto){
+  texto=(texto??txt.value).trim();if(!texto||ocupado)return;
+  paraMic();txt.value='';ajusta();
+  const agora=Date.now(),ultima=H.msgs.length?H.msgs[H.msgs.length-1].t:0;
+  if(!H.ini||agora-ultima>PAUSA)H.ini=new Date(agora).toISOString(); // conversa nova depois de 6 horas parada
+  if(!H.msgs.length)lista.innerHTML='';
+  if(diaDe(agora)!==(ultima?diaDe(ultima):'')){const s=document.createElement('div');s.className='dia';s.textContent=diaDe(agora);lista.appendChild(s)}
+  H.msgs.push({role:'user',content:texto,t:agora});salva();balao('u',texto,agora);memAdd('u',texto);
+  const desde=Date.parse(H.ini);
+  const enviar=H.msgs.filter(m=>m.t>=desde).slice(-20).map(m=>({role:m.role,content:m.role==='user'?m.content:(m.fala||'')+(m.telas||[]).map(j=>'\n\n(Mandei aqui no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join('')}));
+  ocupado=true;ajusta();st.textContent='DIGITANDO...';st.classList.add('ativo');
+  const bal=document.createElement('div');bal.className='m a';bal.innerHTML='<span class="dig"><b></b><b></b><b></b></span>';lista.appendChild(bal);rola();
+  let fala='',quadro=null;const telas=[],cards=[];
+  try{
+    const r=await fetch(FN_AGENTE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:AG,canal:'chat',interlocutor:'Jonathan',pessoa:PESSOA,inicio:H.ini,sala:'chat no celular',mensagens:enviar,stream:true})});
+    if(!r.ok||!r.body)throw new Error('sem resposta');
+    const rd=r.body.getReader(),dec=new TextDecoder();
+    for(;;){const {value,done}=await rd.read();if(done)break;let t='';
+      for(const ch of dec.decode(value,{stream:true})){
+        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);telas.push(j);cards.push(cartao(j));lista.appendChild(bal);rola()}catch(e){}quadro=null}else quadro+=ch}
+        else if(ch==='\u001e')quadro='';else t+=ch}
+      if(t){fala+=t;if(fala.trim()){bal.innerHTML=linkifica(fala.trim());rola()}}}
+    fala=fala.replace(/[ \t]+\n/g,'\n').trim();
+    if(!fala&&!telas.length)throw new Error('vazio');
+    const fim=Date.now();
+    if(fala)bal.innerHTML=linkifica(fala)+'<span class="h">'+hora(fim)+'</span>';else bal.remove();
+    if(fala&&cards.length)lista.insertBefore(bal,cards[0]); // a frase vem antes dos cartões, como no histórico
+    H.msgs.push({role:'assistant',fala,telas,t:fim});salva();
+    memAdd('a',fala+telas.map(j=>'\n\n(Mandei no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join(''));
+  }catch(e){
+    bal.classList.add('err');bal.textContent='Não consegui responder agora. Confere a internet e tenta de novo.';
+    H.msgs.pop();salva();txt.value=texto;
+  }
+  ocupado=false;ajusta();st.textContent='ONLINE';st.classList.remove('ativo');rola();
+}
+
+// microfone: reconhecimento de voz do próprio celular (pt-BR)
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null,gravando=false,base='';
+function paraMic(){if(rec&&gravando){gravando=false;try{rec.stop()}catch(e){}}mic.classList.remove('on');aviso.textContent=''}
+mic.onclick=()=>{
+  if(!SR){aviso.textContent='USE O MICROFONE DO TECLADO PARA DITAR';txt.focus();setTimeout(()=>{aviso.textContent=''},3500);return}
+  if(gravando){gravando=false;try{rec.stop()}catch(e){}return}
+  if(ocupado)return;
+  rec=new SR();rec.lang='pt-BR';rec.interimResults=true;rec.continuous=true;base=txt.value.trim();let fin='';
+  rec.onresult=e=>{let inter='';for(let i=e.resultIndex;i<e.results.length;i++){const r=e.results[i];if(r.isFinal)fin+=r[0].transcript+' ';else inter+=r[0].transcript}
+    txt.value=(base+' '+fin+inter).replace(/\s+/g,' ').trim();ajusta()};
+  rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')aviso.textContent='LIBERE O MICROFONE NAS CONFIGURAÇÕES';};
+  rec.onend=()=>{const estava=mic.classList.contains('on');mic.classList.remove('on');gravando=false;
+    if(aviso.textContent==='OUVINDO... TOQUE DE NOVO PARA ENVIAR')aviso.textContent='';
+    if(estava&&txt.value.trim())manda()};
+  try{rec.start();gravando=true;mic.classList.add('on');aviso.textContent='OUVINDO... TOQUE DE NOVO PARA ENVIAR'}catch(e){aviso.textContent='NÃO CONSEGUI LIGAR O MICROFONE'}
+};
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+desenha();ajusta();
+</script>
+</body>
+</html>
