@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Vanessa · Google Drive</title>
+<title>Vanessa IA · Google</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{color-scheme:dark;--ink:#EAF2F4;--mut:#8fa1a7;--or:#FFA436;--or2:#FFD08A}
@@ -26,17 +26,17 @@ a.bt small{display:block;font:400 13px Inter,sans-serif;letter-spacing:0;color:v
 <body>
 <div class="caixa">
   <img src="assets/vanessa-rosto.jpg" alt="Vanessa">
-  <h1>GOOGLE DRIVE DA VANESSA</h1>
-  <p>Autorize cada Drive uma vez. Ela só procura, lê e cria arquivos novos quando você pedir; nada é alterado nem apagado.</p>
+  <h1>GOOGLE DRIVE E AGENDA DA VANESSA</h1>
+  <p>Autorize cada conta uma vez. No Drive ela só procura, lê e cria arquivos novos. Na agenda ela vê, cria e remarca compromissos quando você pedir. Nada é apagado.</p>
   <div id="aviso"></div>
-  <a class="bt" href="https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/drive-auth?conta=jonathan">AUTORIZAR DRIVE DO JONATHAN<small>entre com santosandradejonathan@gmail.com</small></a>
-  <a class="bt" href="https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/drive-auth?conta=nostro">AUTORIZAR DRIVE DA NOSTRO<small>entre com nostroagencia@gmail.com</small></a>
-  <div class="nota">O Google vai avisar que o app não foi verificado, porque ele é só da Nostro. Clique em "Avançado" e depois em "Acessar Vanessa Nostro".</div>
+  <a class="bt" href="https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/drive-auth?conta=jonathan">AUTORIZAR GOOGLE DO JONATHAN<small>entre com santosandradejonathan@gmail.com</small></a>
+  <a class="bt" href="https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/drive-auth?conta=nostro">AUTORIZAR GOOGLE DA NOSTRO (DRIVE E AGENDA)<small>entre com nostroagencia@gmail.com</small></a>
+  <div class="nota">O Google vai avisar que o app não foi verificado, porque ele é só da Nostro. Clique em "Avançado" e depois em "Acessar Vanessa Nostro". Na tela de permissões, deixe marcadas todas as caixas, inclusive a da agenda.</div>
 </div>
 <script>
 {
 const q=new URLSearchParams(location.search),av=document.getElementById('aviso');
-const nomes={jonathan:'Drive do Jonathan',nostro:'Drive da Nostro'};
+const nomes={jonathan:'Google do Jonathan',nostro:'Google da Nostro (Drive e agenda)'};
 if(q.get('ok')){av.className='aviso ok';av.textContent=(nomes[q.get('ok')]||'Drive')+' autorizado. A Vanessa já pode usar.'}
 else if(q.get('erro')){av.className='aviso erro';av.textContent=q.get('erro')}
 }

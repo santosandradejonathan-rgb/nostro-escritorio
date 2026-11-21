@@ -1,6 +1,6 @@
 // Google Drive da Vanessa: autorização das contas (GET) e ferramentas do Drive (POST, só a função "agente" chama).
 // Segredos: GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET. O acesso de cada conta fica na tabela drive_contas (só o servidor lê).
-// Permissões pedidas ao Google: ler o Drive (procurar) e criar arquivos novos. Nada é alterado nem apagado.
+// Permissões pedidas ao Google: ler o Drive (procurar), criar arquivos novos e a agenda (ver, criar e remarcar eventos). Nada é apagado.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const URL_SB = Deno.env.get("SUPABASE_URL") || "";
@@ -14,7 +14,7 @@ const CONTAS: Record<string, { email: string; nome: string }> = {
   jonathan: { email: "santosandradejonathan@gmail.com", nome: "Drive do Jonathan" },
   nostro: { email: "nostroagencia@gmail.com", nome: "Drive da Nostro" },
 };
-const ESCOPOS = "openid email https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file";
+const ESCOPOS = "openid email https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events";
 
 const db = (caminho: string, o: RequestInit = {}) =>
   fetch(`${URL_SB}/rest/v1/${caminho}`, { ...o, headers: { apikey: CHAVE, Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json", ...(o.headers || {}) } });
@@ -154,6 +154,66 @@ async function linkPublico(a: any) {
   return { ok: true, nome: m.name, url: `${URL_SB}/storage/v1/object/public/ig-publicar/${caminho}` };
 }
 
+/* ---------- Google Agenda (padrão: agenda da Nostro) ---------- */
+const TZ = "America/Sao_Paulo";
+const contaAgenda = (c: string) => (c === "jonathan" ? "jonathan" : "nostro");
+// "2026-11-25T14:00" (horário de Brasília) -> ISO com fuso
+const comFuso = (t: string) => { const x = String(t || "").trim().replace(" ", "T"); if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(x)) return ""; return /([+-]\d{2}:?\d{2}|Z)$/.test(x) ? x : x.slice(0, 16) + ":00-03:00"; };
+const hBR = (iso: string) => new Date(iso).toLocaleString("pt-BR", { timeZone: TZ, weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const GA = async (conta: string, caminho: string, o: RequestInit = {}) => {
+  const r = await fetch("https://www.googleapis.com/calendar/v3/" + caminho, { ...o, headers: { Authorization: `Bearer ${await acesso(conta)}`, "Content-Type": "application/json", ...(o.headers || {}) } });
+  const t = await r.text();
+  if (!r.ok) {
+    if (r.status === 403 && /insufficient|scope/i.test(t)) throw new Error(`A agenda ainda não foi liberada nessa conta. O Jonathan precisa autorizar de novo em ${PAGINA} (botão da ${CONTAS[conta].nome}) e marcar a permissão da agenda.`);
+    if (r.status === 403 && /has not been used|disabled/i.test(t)) throw new Error("A API do Google Agenda ainda não está ativada no projeto do Google Cloud.");
+    throw new Error("A agenda respondeu com erro " + r.status + ": " + t.slice(0, 160));
+  }
+  return t ? JSON.parse(t) : {};
+};
+const evento = (e: any) => ({ id: e.id, titulo: e.summary || "(sem título)", inicio: e.start?.dateTime ? hBR(e.start.dateTime) : (e.start?.date ? e.start.date + " (dia todo)" : ""), fim: e.end?.dateTime ? hBR(e.end.dateTime) : "", local: e.location || undefined, meet: e.hangoutLink || undefined, convidados: (e.attendees || []).map((x: any) => x.email).slice(0, 10), descricao: e.description ? String(e.description).slice(0, 200) : undefined, link: e.htmlLink });
+async function agendaVer(a: any) {
+  const conta = contaAgenda(a.conta);
+  const de = a.de ? new Date(comFuso(String(a.de).length === 10 ? a.de + "T00:00" : a.de)) : new Date();
+  const dias = Math.min(31, Math.max(1, Math.round(+a.dias || 7)));
+  const ate = new Date(de.getTime() + dias * 864e5);
+  const q = new URLSearchParams({ timeMin: de.toISOString(), timeMax: ate.toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "50", timeZone: TZ });
+  if (a.busca) q.set("q", String(a.busca).slice(0, 80));
+  const r = await GA(conta, `calendars/primary/events?${q}`);
+  return { agenda: CONTAS[conta].nome.replace("Drive", "Agenda"), periodo: `${hBR(de.toISOString())} até ${hBR(ate.toISOString())}`, total: (r.items || []).length, eventos: (r.items || []).filter((e: any) => e.status !== "cancelled").map(evento) };
+}
+async function agendaCriar(a: any) {
+  const conta = contaAgenda(a.conta);
+  const titulo = String(a.titulo || "").trim().slice(0, 200);
+  const ini = comFuso(a.inicio);
+  if (!titulo || !ini) return { erro: "Falta o título ou o início (formato AAAA-MM-DDTHH:MM, horário de Brasília)." };
+  const fim = a.fim ? comFuso(a.fim) : new Date(new Date(ini).getTime() + Math.max(15, Math.round(+a.duracao_min || 60)) * 60000).toISOString();
+  if (!fim || new Date(fim) <= new Date(ini)) return { erro: "O fim precisa ser depois do início." };
+  const convidados = (Array.isArray(a.convidados) ? a.convidados : a.convidados ? String(a.convidados).split(/[,;\s]+/) : []).map((x: any) => String(x).trim().toLowerCase()).filter((x: string) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(x)).slice(0, 20);
+  const corpo: any = { summary: titulo, start: { dateTime: ini, timeZone: TZ }, end: { dateTime: fim, timeZone: TZ }, description: a.descricao ? String(a.descricao).slice(0, 4000) : undefined, location: a.local ? String(a.local).slice(0, 300) : undefined, attendees: convidados.map((email: string) => ({ email })), reminders: { useDefault: true } };
+  if (a.meet) corpo.conferenceData = { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
+  // conflito: avisa se já tem algo no mesmo horário (não impede)
+  let conflito: any[] = [];
+  try { const c = await GA(conta, `calendars/primary/events?${new URLSearchParams({ timeMin: new Date(ini).toISOString(), timeMax: new Date(fim).toISOString(), singleEvents: "true", maxResults: "5" })}`); conflito = (c.items || []).filter((e: any) => e.status !== "cancelled" && e.start?.dateTime).map((e: any) => e.summary); } catch (_e) { /* segue */ }
+  const e = await GA(conta, `calendars/primary/events?conferenceDataVersion=1&sendUpdates=${convidados.length ? "all" : "none"}`, { method: "POST", body: JSON.stringify(corpo) });
+  return { ok: true, agenda: CONTAS[conta].nome.replace("Drive", "Agenda"), ...evento(e), convites_enviados: convidados.length ? convidados : undefined, aviso: conflito.length ? "Já tinha no mesmo horário: " + conflito.join(", ") : undefined };
+}
+async function agendaRemarcar(a: any) {
+  const conta = contaAgenda(a.conta);
+  const id = String(a.evento_id || "").replace(/[^A-Za-z0-9_\-]/g, "");
+  if (!id) return { erro: "Falta o evento_id (vem do agenda_ver)." };
+  const atual = await GA(conta, `calendars/primary/events/${id}`);
+  const ini = a.inicio ? comFuso(a.inicio) : "";
+  const dur = atual.start?.dateTime && atual.end?.dateTime ? new Date(atual.end.dateTime).getTime() - new Date(atual.start.dateTime).getTime() : 3600e3;
+  const fim = a.fim ? comFuso(a.fim) : ini ? new Date(new Date(ini).getTime() + dur).toISOString() : "";
+  const corpo: any = {};
+  if (ini) { corpo.start = { dateTime: ini, timeZone: TZ }; corpo.end = { dateTime: fim, timeZone: TZ }; }
+  if (a.titulo) corpo.summary = String(a.titulo).slice(0, 200);
+  if (a.local) corpo.location = String(a.local).slice(0, 300);
+  if (!Object.keys(corpo).length) return { erro: "Diga o que muda: novo início, título ou local." };
+  const e = await GA(conta, `calendars/primary/events/${id}?sendUpdates=${(atual.attendees || []).length ? "all" : "none"}`, { method: "PATCH", body: JSON.stringify(corpo) });
+  return { ok: true, antes: evento(atual).inicio, ...evento(e) };
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (req.method === "GET") return autorizar(url);
@@ -167,6 +227,9 @@ Deno.serve(async (req) => {
     if (f === "drive_ler") return json(await ler(a));
     if (f === "drive_salvar") return json(await salvar(a));
     if (f === "drive_link_publico") return json(await linkPublico(a));
+    if (f === "agenda_ver") return json(await agendaVer(a));
+    if (f === "agenda_criar") return json(await agendaCriar(a));
+    if (f === "agenda_remarcar") return json(await agendaRemarcar(a));
     if (f === "drive_status") {
       const r = await db("drive_contas?select=conta,email,atualizado_em");
       return json({ contas: await r.json().catch(() => []) });
