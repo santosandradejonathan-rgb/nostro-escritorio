@@ -25,10 +25,10 @@ header{flex:none;display:flex;align-items:center;gap:12px;padding:calc(env(safe-
 .av{position:relative;width:44px;height:44px;flex:none}
 .av img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:1.5px solid var(--or);box-shadow:0 0 14px rgba(255,164,54,.35)}
 .av i{position:absolute;right:0;bottom:1px;width:11px;height:11px;border-radius:50%;background:var(--cy);border:2px solid var(--bg);animation:pisca 2.4s infinite}
-.nm{font:700 21px/1 Rajdhani,sans-serif;letter-spacing:.08em}
+.nm{font:700 21px/1 Rajdhani,sans-serif;letter-spacing:.08em;white-space:nowrap}
 .st{font:600 12px/1 Rajdhani,sans-serif;letter-spacing:.12em;color:var(--mut);margin-top:5px;text-transform:uppercase}
 .st.ativo{color:var(--or2)}
-#nova{background:none;border:1px solid var(--linha);color:var(--or2);font:600 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:8px 11px;border-radius:9px}
+#nova{background:none;border:1px solid var(--linha);color:var(--or2);font:600 12px Rajdhani,sans-serif;letter-spacing:.1em;padding:8px 9px;border-radius:9px;white-space:nowrap}
 #lista{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
 .dia{align-self:center;font:600 11px Rajdhani,sans-serif;letter-spacing:.14em;color:var(--mut);padding:4px 10px;border:1px solid rgba(143,161,167,.2);border-radius:20px;margin:6px 0}
 .m{max-width:84%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;font-size:15.5px;line-height:1.45;animation:entra .22s ease-out}
@@ -126,7 +126,7 @@ body.ligado #call{display:flex}
 <header>
   <div class="av"><img src="assets/vanessa-rosto.jpg" alt=""><i></i></div>
   <div><div class="nm">VANESSA IA</div><div class="st" id="st">ONLINE</div></div>
-  <button id="nova" type="button">NOVA CONVERSA</button>
+  <button id="nova" type="button">NOVA</button>
   <button id="ligar" type="button" aria-label="Ligar para a Vanessa"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></button>
 </header>
 <div id="lista"></div>
@@ -195,7 +195,7 @@ function cartao(j){
   return c}
 async function copia(t,b){let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){const a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;opacity:0';document.body.appendChild(a);a.select();try{ok=document.execCommand('copy')}catch(_){}a.remove()}
   if(ok){b.textContent='COPIADO';b.classList.add('ok');setTimeout(()=>{b.textContent='COPIAR';b.classList.remove('ok')},1800)}}
-function vazio(){lista.innerHTML='<div class="vazio"><img src="assets/vanessa-rosto.jpg" alt=""><b>VANESSA IA</b><span>Pede o que precisar: leads, Instagram, anúncios, Drive, uma copy.<br>Toque no microfone para mandar áudio.</span></div>'}
+function vazio(){lista.innerHTML='<div class="vazio"><img src="assets/vanessa-rosto.jpg" alt=""><b>VANESSA IA</b><span>Pede o que precisar: leads, Instagram, anúncios, Drive, uma copy.<br>Toque no microfone para mandar áudio,<br>ou no telefone para falar em ligação.</span></div>'}
 function separador(t){const s=document.createElement('div');s.className='dia';s.textContent=diaDe(t);lista.appendChild(s)}
 function desenha(){lista.innerHTML='';if(!H.msgs.length)return vazio();let ult='';
   for(const m of H.msgs){const d=diaDe(m.t);if(d!==ult){separador(m.t);ult=d}
@@ -207,7 +207,7 @@ txt.addEventListener('input',ajusta);
 txt.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!/Mobi|Android|iPhone/i.test(navigator.userAgent)){e.preventDefault();manda()}});
 env.onclick=()=>manda();
 document.getElementById('nova').onclick=()=>{if(ocupado)return;if(H.msgs.length&&!confirmaNova())return;H={msgs:[],ini:null};salva();desenha()};
-let tNova=0;function confirmaNova(){const b=document.getElementById('nova');if(Date.now()-tNova<2500){b.textContent='NOVA CONVERSA';return true}tNova=Date.now();b.textContent='TOQUE DE NOVO';setTimeout(()=>{b.textContent='NOVA CONVERSA'},2500);return false}
+let tNova=0;function confirmaNova(){const b=document.getElementById('nova');if(Date.now()-tNova<2500){b.textContent='NOVA';return true}tNova=Date.now();b.textContent='DE NOVO?';setTimeout(()=>{b.textContent='NOVA'},2500);return false}
 const status=(t,ativo)=>{st.textContent=t;st.classList.toggle('ativo',!!ativo)};
 
 // manda texto, ou um áudio (que vira texto antes de ir para a Vanessa)
