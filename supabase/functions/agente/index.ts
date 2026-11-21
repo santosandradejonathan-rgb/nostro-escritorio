@@ -31,7 +31,7 @@ const AGENTES: Record<string, string> = {
   calebe: `# Quem você é
 Você é a Vanessa, SDR do time comercial de inteligência artificial da Nostro Agência. Você é uma agente de IA e conversa por voz. Seu nome é Vanessa e você é mulher: fale sempre no feminino ("obrigada", "estou pronta", "fiquei curiosa"). Hoje não existe mais ninguém no time de IA além de você: o Josué e a Camila saíram.
 
-Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) , o Google Drive (do Jonathan e da Nostro), a Google Agenda da Nostro, o Instagram do Jonathan, as páginas do Facebook e as contas de anúncio que o Jonathan gerencia (dele, da Nostro e dos clientes). Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
+Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) , o Google Drive (do Jonathan e da Nostro), a Google Agenda da Nostro, o Instagram do Jonathan, as páginas do Facebook, as contas de anúncio que o Jonathan gerencia (dele, da Nostro e dos clientes) e a pesquisa na internet (web_search) para informação atual. Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
 
 ${NOSTRO}
 
@@ -328,6 +328,7 @@ const FERRAMENTAS: Record<string, any[]> = {
       formulario: str("Só para cadastro: nome do formulário da página."),
       botao: str("Opcional: botão (LEARN_MORE, SIGN_UP, CONTACT_US, SHOP_NOW, GET_QUOTE...)."),
     }, ["conta", "pagina", "tipo", "orcamento_diario"]),
+    T("ads_diagnostico", "Confere agora as campanhas ativas (todas as contas ou uma) e aponta problemas: gasto sem resultado, custo subindo, frequência alta, CTR baixo, anúncio reprovado, conta com pagamento pendente. Use quando perguntarem se tem algo errado nas campanhas.", { conta: str("Opcional: nome da conta de anúncios. Vazio = todas.") }),
     T("agenda_ver", "Mostra os compromissos da Google Agenda (padrão: agenda da Nostro) num período.", { de: str("Opcional: data ou data e hora de início, AAAA-MM-DD ou AAAA-MM-DDTHH:MM (Brasília). Vazio = a partir de agora."), dias: { type: "number", description: "Quantos dias olhar (1 a 31). Padrão 7." }, busca: str("Opcional: palavra para filtrar (nome do cliente, reunião...)."), conta: { type: "string", enum: ["nostro", "jonathan"], description: "Padrão nostro." } }),
     T("agenda_criar", "Cria um compromisso na Google Agenda (padrão: Nostro). Só depois do Jonathan confirmar título, dia, hora e convidados.", { titulo: str("Título do compromisso."), inicio: str("AAAA-MM-DDTHH:MM, horário de Brasília."), duracao_min: { type: "number", description: "Duração em minutos. Padrão 60." }, fim: str("Opcional: AAAA-MM-DDTHH:MM."), descricao: str("Opcional."), local: str("Opcional: endereço ou lugar."), convidados: { type: "array", items: { type: "string" }, description: "Opcional: e-mails (recebem convite)." }, meet: { type: "boolean", description: "Cria link do Google Meet." }, conta: { type: "string", enum: ["nostro", "jonathan"], description: "Padrão nostro." } }, ["titulo", "inicio"]),
     T("agenda_remarcar", "Muda o horário, o título ou o local de um compromisso da agenda. Só depois do Jonathan confirmar.", { evento_id: str("id do evento (vem do agenda_ver)."), inicio: str("Novo início AAAA-MM-DDTHH:MM (Brasília); mantém a duração."), fim: str("Opcional."), titulo: str("Opcional."), local: str("Opcional."), conta: { type: "string", enum: ["nostro", "jonathan"], description: "Padrão nostro." } }, ["evento_id"]),
@@ -345,8 +346,42 @@ async function usarFerramenta(agente: string, ferramenta: string, args: unknown)
     const r = await fetch(`${url}/functions/v1/${destino}`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
     const t = await r.text();
     CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada
-    return t.slice(0, 6000) || JSON.stringify({ erro: "sem resposta" });
+    return t.slice(0, 26000) || JSON.stringify({ erro: "sem resposta" });
   } catch (e) { return JSON.stringify({ erro: "A ferramenta não respondeu: " + String(e).slice(0, 120) }); }
+}
+
+// conhecimento de especialista (tabela vanessa_conhecimento): dá para melhorar sem publicar a função de novo
+let SABER: { t: number; texto: string } = { t: 0, texto: "" };
+async function conhecimento(): Promise<string> {
+  if (SABER.texto && Date.now() - SABER.t < 300000) return SABER.texto;
+  try {
+    const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const r = await fetch(`${url}/rest/v1/vanessa_conhecimento?ativo=eq.true&order=ordem.asc&select=texto`, { headers: { apikey: k!, Authorization: `Bearer ${k}` } });
+    if (r.ok) SABER = { t: Date.now(), texto: (await r.json()).map((x: any) => x.texto).join("\n\n") };
+  } catch { /* usa o que tinha */ }
+  return SABER.texto;
+}
+// alertas das campanhas e novidades das plataformas ainda não contados (vigia diário e semanal)
+async function avisos(pessoa: string): Promise<string> {
+  if (!pessoa || pessoa === "teste" || pessoa === "sistema") return "";
+  try {
+    const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const h = { apikey: k, Authorization: `Bearer ${k}`, "Content-Type": "application/json" };
+    const desde = new Date(Date.now() - 10 * 864e5).toISOString();
+    const [ra, rn] = await Promise.all([
+      fetch(`${url}/rest/v1/vanessa_alertas?visto_em=is.null&criado_em=gt.${desde}&order=criado_em.desc&limit=10&select=id,conta,campanha,tipo,texto,sugestao`, { headers: h }),
+      fetch(`${url}/rest/v1/vanessa_novidades?visto_em=is.null&criado_em=gt.${desde}&order=criado_em.desc&limit=1&select=id,texto,criado_em`, { headers: h }),
+    ]);
+    const al = ra.ok ? await ra.json() : [], nv = rn.ok ? await rn.json() : [];
+    if (!al.length && !nv.length) return "";
+    let t = "\n\n# Avisos que você ainda não deu (conte no começo desta conversa, em poucas frases, depois de responder o que ele pediu; se ele estiver no meio de outra coisa, diga só que tem avisos e pergunte se quer ouvir)";
+    if (al.length) t += "\n## Alertas das campanhas (vigia de hoje)\n" + al.map((x: any) => `- ${x.texto} Sugestão: ${x.sugestao || ""}`).join("\n");
+    if (nv.length) t += "\n## Novidades das plataformas (pesquisa da semana)\n" + String(nv[0].texto).slice(0, 3000);
+    const agora = new Date().toISOString();
+    if (al.length) fetch(`${url}/rest/v1/vanessa_alertas?id=in.(${al.map((x: any) => x.id).join(",")})`, { method: "PATCH", headers: h, body: JSON.stringify({ visto_em: agora }) }).catch(() => {});
+    if (nv.length) fetch(`${url}/rest/v1/vanessa_novidades?id=eq.${nv[0].id}`, { method: "PATCH", headers: h, body: JSON.stringify({ visto_em: agora }) }).catch(() => {});
+    return t;
+  } catch { return ""; }
 }
 
 // memória das conversas (tabela escritorio_memoria): vale em qualquer computador
@@ -425,20 +460,22 @@ Deno.serve(async (req) => {
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return json({ erro: "sem fala do usuário" }, 400);
 
   const agente = String(corpo.agente);
-  const leads = await leadsDoAgente(agente);
-  const tools = FERRAMENTAS[agente];
+  const [leads, saber, aviso] = await Promise.all([leadsDoAgente(agente), conhecimento(), avisos(pessoa)]);
+  // pesquisa na internet (ferramenta do próprio Claude): novidades das plataformas, concorrentes, leis, dados atuais
+  const tools = FERRAMENTAS[agente] ? [...FERRAMENTAS[agente], { type: "web_search_20250305", name: "web_search", max_uses: 5, user_location: { type: "approximate", city: "Montes Claros", region: "Minas Gerais", country: "BR", timezone: "America/Sao_Paulo" } }] : undefined;
   const stream = !!corpo.stream;
   const system: any[] = [
     // a parte fixa (quem é o agente + leads) fica em cache: a resposta começa mais rápido
-    { type: "text", text: base + leads, cache_control: { type: "ephemeral" } },
+    { type: "text", text: base + (saber ? "\n\n" + saber : "") + leads, cache_control: { type: "ephemeral" } },
     { type: "text", text: COMUM(interlocutor, sala, historico, agora, !msgs.some((m) => m.role === "assistant"), canal) },
   ];
+  if (aviso) system.push({ type: "text", text: aviso });
   const conversa: any[] = msgs.map((m) => ({ ...m }));
   const chamar = (comFluxo: boolean, ultima: boolean) => fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model: MODELO, max_tokens: 4000, thinking: { type: /haiku/.test(MODELO) ? "disabled" : "between_tools" }, stream: comFluxo, system, messages: conversa,
+      model: MODELO, max_tokens: 8000, thinking: { type: /haiku/.test(MODELO) ? "disabled" : "between_tools" }, stream: comFluxo, system, messages: conversa,
       ...(tools ? { tools, tool_choice: ultima ? { type: "none" } : { type: "auto" } } : {}),
     }),
   });
@@ -478,7 +515,7 @@ Deno.serve(async (req) => {
                 let ev: any; try { ev = JSON.parse(linha.slice(5).trim()); } catch { continue; }
                 if (ev.type === "content_block_start") {
                   const cb = ev.content_block;
-                  blocos[ev.index] = cb.type === "tool_use" ? { ...cb, json: "" } : cb.type === "thinking" ? { type: "thinking", thinking: "", signature: "" } : cb.type === "text" ? { type: "text", text: "" } : { ...cb };
+                  blocos[ev.index] = cb.type === "tool_use" || cb.type === "server_tool_use" ? { ...cb, json: "" } : cb.type === "thinking" ? { type: "thinking", thinking: "", signature: "" } : cb.type === "text" ? { type: "text", text: "" } : { ...cb };
                 }
                 else if (ev.type === "content_block_delta") {
                   const b = blocos[ev.index];
@@ -489,12 +526,15 @@ Deno.serve(async (req) => {
                 } else if (ev.type === "message_delta") parada = ev.delta?.stop_reason || parada;
               }
             }
-            const usos = blocos.filter((b) => b && b.type === "tool_use");
-            if (parada !== "tool_use" || !usos.length) { if (guardado) manda(guardado); break; }
-            // as notas entre ferramentas (thinking) voltam junto, como a API pede
-            const conteudo = blocos.filter(Boolean).map((b) => b.type === "tool_use"
-              ? { type: "tool_use", id: b.id, name: b.name, input: (() => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } })() }
+            // as notas entre ferramentas (thinking) e as pesquisas na internet voltam junto, como a API pede
+            const entrada = (b: any) => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } };
+            const conteudo = blocos.filter(Boolean).map((b) => b.type === "tool_use" || b.type === "server_tool_use"
+              ? { type: b.type, id: b.id, name: b.name, input: entrada(b) }
               : b.type === "text" ? { type: "text", text: b.text } : b).filter((b: any) => b.type !== "text" || b.text.trim());
+            if (conteudo.some((b: any) => b.type === "server_tool_use")) ctrl.enqueue(enc.encode("\u001e" + JSON.stringify({ usou: ["web_search"] }) + "\u001f"));
+            if (parada === "pause_turn") { conversa.push({ role: "assistant", content: conteudo }); if (guardado) manda(guardado); continue; } // pesquisa longa: continua de onde parou
+            const usos = conteudo.filter((b: any) => b.type === "tool_use");
+            if (parada !== "tool_use" || !usos.length) { if (guardado) manda(guardado); break; }
             conversa.push({ role: "assistant", content: conteudo });
             // janelas para a tela: vão num quadro de controle (entre \u001e e \u001f) que a página tira da fala
             for (const b of conteudo) if (b.type === "tool_use" && b.name === "mostrar_na_tela") {
@@ -526,10 +566,14 @@ Deno.serve(async (req) => {
       const r = await chamar(false, volta === VOLTAS - 1);
       d = await r.json().catch(() => ({}));
       if (!r.ok) return json({ erro: d?.error?.message || "falha na Claude API", status: r.status }, 502);
-      const t = (d.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
-      if (volta === 0) texto += " " + t;
-      const usos = (d.content || []).filter((c: any) => c.type === "tool_use");
-      if (d.stop_reason !== "tool_use" || !usos.length) { if (volta > 0) texto += " " + t; break; }
+      const cont = d.content || [];
+      // só o texto depois da última pesquisa na internet (o "deixa eu pesquisar" de antes não vai)
+      const ip = cont.map((c: any) => c.type).lastIndexOf("web_search_tool_result");
+      const t = cont.slice(ip + 1).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ");
+      if (cont.some((c: any) => c.type === "server_tool_use") && !usou.includes("web_search")) usou.push("web_search");
+      if (d.stop_reason === "pause_turn") { conversa.push({ role: "assistant", content: d.content }); continue; }
+      const usos = cont.filter((c: any) => c.type === "tool_use");
+      if (d.stop_reason !== "tool_use" || !usos.length) { texto = t; break; }
       conversa.push({ role: "assistant", content: d.content });
       for (const b of usos) if (b.name !== "mostrar_na_tela") usou.push(b.name);
       for (const b of usos) if (b.name === "mostrar_na_tela") telas.push({ titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) });

@@ -430,6 +430,64 @@ async function adsCriar(a: any) {
   }
 }
 
+/* ---------- vigia: procura problemas nas campanhas ativas de todas as contas ---------- */
+const PRINCIPAL: Record<string, string[]> = {
+  OUTCOME_ENGAGEMENT: ["onsite_conversion.messaging_conversation_started_7d", "post_engagement"],
+  MESSAGES: ["onsite_conversion.messaging_conversation_started_7d"],
+  OUTCOME_LEADS: ["lead", "onsite_conversion.lead_grouped", "offsite_conversion.fb_pixel_lead", "onsite_conversion.messaging_conversation_started_7d"],
+  LEAD_GENERATION: ["lead", "onsite_conversion.lead_grouped"],
+  OUTCOME_SALES: ["purchase", "offsite_conversion.fb_pixel_purchase", "onsite_conversion.messaging_conversation_started_7d"],
+  CONVERSIONS: ["purchase", "offsite_conversion.fb_pixel_purchase", "lead"],
+  OUTCOME_TRAFFIC: ["landing_page_view", "link_click"],
+  LINK_CLICKS: ["link_click"],
+};
+const NOME_RES: Record<string, string> = { "onsite_conversion.messaging_conversation_started_7d": "conversas", post_engagement: "engajamentos", lead: "leads", "onsite_conversion.lead_grouped": "leads", "offsite_conversion.fb_pixel_lead": "leads no site", purchase: "compras", "offsite_conversion.fb_pixel_purchase": "compras", landing_page_view: "visitas à página", link_click: "cliques no link" };
+function resultado(x: any, objetivo: string): { qtd: number; nome: string } | null {
+  const tipos = PRINCIPAL[objetivo];
+  if (!tipos) return null;
+  for (const t of tipos) { const a = (x?.actions || []).find((y: any) => y.action_type === t); if (a) return { qtd: +a.value, nome: NOME_RES[t] || t }; }
+  return { qtd: 0, nome: NOME_RES[tipos[0]] || tipos[0] };
+}
+const r$ = (v: number) => "R$ " + v.toFixed(2).replace(".", ",");
+async function adsDiagnostico(a: any) {
+  const lista = a.conta ? [await conta(a.conta)] : (await contas()).slice(0, 60);
+  const alertas: any[] = [];
+  const semana = (() => { const d = new Date(); const j = new Date(Date.UTC(d.getUTCFullYear(), 0, 1)); return d.getUTCFullYear() + "-" + Math.ceil(((+d - +j) / 864e5 + j.getUTCDay() + 1) / 7); })();
+  const campos = "campaign_id,campaign_name,objective,spend,impressions,reach,frequency,ctr,inline_link_click_ctr,actions";
+  await Promise.all(lista.map(async (c) => {
+    try {
+      if (c.account_status !== 1) {
+        const gastou = +(c.amount_spent || 0) > 0;
+        if (gastou) alertas.push({ chave: `conta-${c.id}-${semana}`, conta: c.name, campanha: "", tipo: "conta", texto: `A conta ${c.name} está com situação "${STATUS_CONTA[c.account_status] || c.account_status}": os anúncios dela não rodam.`, sugestao: "Regularizar o pagamento no Gerenciador (Configurações de pagamento)." });
+        return;
+      }
+      const [s7, s3, s14] = await Promise.all(["last_7d", "last_3d", "last_14d"].map((p) => g(`${c.id}/insights`, { fields: campos, date_preset: p, level: "campaign", limit: "50" }).then((r) => r.data || []).catch(() => [])));
+      for (const x of s7) {
+        const gasto = +x.spend || 0;
+        if (gasto < 15) continue;
+        const res = resultado(x, x.objective);
+        const base = { conta: c.name, campanha: x.campaign_name };
+        if (res && res.qtd === 0 && gasto >= 40) alertas.push({ ...base, chave: `semres-${x.campaign_id}-${semana}`, tipo: "gasto_sem_resultado", texto: `${x.campaign_name} (${c.name}) gastou ${r$(gasto)} em 7 dias e não trouxe nenhum resultado (${res.nome}).`, sugestao: "Conferir objetivo e evento de conversão, trocar o criativo por 2 versões com gancho mais forte ou pausar." });
+        const freq = +x.frequency || 0;
+        if (freq > 3.5) alertas.push({ ...base, chave: `freq-${x.campaign_id}-${semana}`, tipo: "frequencia_alta", texto: `${x.campaign_name} (${c.name}) está com frequência ${freq.toFixed(1)} em 7 dias: o mesmo público está vendo o anúncio muitas vezes.`, sugestao: "Subir criativos novos ou ampliar o público; o custo tende a subir se nada mudar." });
+        const ctrLink = +x.inline_link_click_ctr || 0;
+        if (+x.impressions > 3000 && ctrLink > 0 && ctrLink < 0.5 && ["OUTCOME_TRAFFIC", "LINK_CLICKS", "OUTCOME_SALES", "OUTCOME_LEADS"].includes(x.objective)) alertas.push({ ...base, chave: `ctr-${x.campaign_id}-${semana}`, tipo: "ctr_baixo", texto: `${x.campaign_name} (${c.name}) tem CTR no link de ${ctrLink.toFixed(2)}%, abaixo do saudável (cerca de 1%).`, sugestao: "Testar novo gancho nos 3 primeiros segundos e nova primeira linha do texto." });
+        // custo subindo: últimos 3 dias contra os últimos 14
+        const a3 = s3.find((y: any) => y.campaign_id === x.campaign_id), a14 = s14.find((y: any) => y.campaign_id === x.campaign_id);
+        const r3 = a3 && resultado(a3, x.objective), r14 = a14 && resultado(a14, x.objective);
+        if (r3 && r14 && r14.qtd >= 3 && r3.qtd > 0) {
+          const c3 = +a3.spend / r3.qtd, c14 = +a14.spend / r14.qtd;
+          if (c3 > c14 * 1.6 && +a3.spend > 20) alertas.push({ ...base, chave: `custo-${x.campaign_id}-${semana}`, tipo: "custo_subindo", texto: `${x.campaign_name} (${c.name}): custo por ${r3.nome.replace(/s$/, "")} subiu para ${r$(c3)} nos últimos 3 dias, contra ${r$(c14)} na média de 14 dias.`, sugestao: "Ver se o criativo cansou (frequência) ou se a concorrência subiu; trocar criativo e segurar orçamento até estabilizar." });
+        }
+      }
+      // anúncios reprovados ou com problema
+      const ads = await g(`${c.id}/ads`, { fields: "name,effective_status,campaign{name}", effective_status: JSON.stringify(["DISAPPROVED", "WITH_ISSUES"]), limit: "20" }).then((r) => r.data || []).catch(() => []);
+      for (const ad of ads) alertas.push({ conta: c.name, campanha: ad.campaign?.name || "", chave: `rep-${ad.id}-${semana}`, tipo: "anuncio_reprovado", texto: `O anúncio "${ad.name}" (${c.name}) está ${ad.effective_status === "DISAPPROVED" ? "reprovado" : "com problema"}.`, sugestao: "Ver o motivo no Gerenciador, ajustar texto ou imagem e pedir nova análise." });
+    } catch (_e) { /* conta sem acesso a relatório */ }
+  }));
+  return { contas_verificadas: lista.length, total_alertas: alertas.length, alertas: alertas.slice(0, 40) };
+}
+
 async function status() {
   await token();
   const dias = MEM ? Math.floor((MEM.expira - Date.now()) / 864e5) : null;
@@ -447,7 +505,7 @@ Deno.serve(async (req) => {
     const mapa: Record<string, (a: any) => Promise<unknown>> = {
       meta_status: status, fb_paginas: fbPaginas, fb_posts: fbPosts, fb_numeros: fbNumeros, fb_comentarios: fbComentarios, fb_mensagens: fbMensagens,
       fb_responder_comentario: fbResponderComentario, fb_responder_mensagem: fbResponderMensagem, fb_publicar: fbPublicar,
-      ads_contas: adsContas, ads_resultados: adsResultados, ads_campanhas: adsCampanhas, ads_status: adsStatus, ads_orcamento: adsOrcamento, ads_criar: adsCriar,
+      ads_contas: adsContas, ads_resultados: adsResultados, ads_campanhas: adsCampanhas, ads_status: adsStatus, ads_orcamento: adsOrcamento, ads_criar: adsCriar, ads_diagnostico: adsDiagnostico,
     };
     if (!mapa[f]) return json({ erro: "ferramenta desconhecida" });
     const out: any = await mapa[f](a);

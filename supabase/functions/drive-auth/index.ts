@@ -78,7 +78,7 @@ const G = async (conta: string, caminho: string, o: RequestInit = {}) => {
 const TIPO: Record<string, string> = {
   "application/vnd.google-apps.document": "documento", "application/vnd.google-apps.spreadsheet": "planilha",
   "application/vnd.google-apps.presentation": "apresentação", "application/vnd.google-apps.folder": "pasta",
-  "application/pdf": "PDF", "image/jpeg": "imagem", "image/png": "imagem", "video/mp4": "vídeo",
+  "application/pdf": "PDF", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "Word", "image/jpeg": "imagem", "image/png": "imagem", "video/mp4": "vídeo",
 };
 const contasDe = (c: string) => (c === "jonathan" || c === "nostro" ? [c] : ["jonathan", "nostro"]);
 const aspas = (t: string) => String(t || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
@@ -105,10 +105,18 @@ async function ler(a: any) {
   const m = await (await G(conta, `drive/v3/files/${id}?fields=name,mimeType,webViewLink,size&supportsAllDrives=true`)).json();
   const exporta: Record<string, string> = { "application/vnd.google-apps.document": "text/plain", "application/vnd.google-apps.spreadsheet": "text/csv", "application/vnd.google-apps.presentation": "text/plain" };
   let texto = "";
+  const converte = /^application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|rtf|vnd\.oasis\.opendocument\.text)$/.test(m.mimeType);
   if (exporta[m.mimeType]) texto = await (await G(conta, `drive/v3/files/${id}/export?mimeType=${encodeURIComponent(exporta[m.mimeType])}`)).text();
   else if (/^text\/|json|csv|xml/.test(m.mimeType) && +(m.size || 0) < 2e6) texto = await (await G(conta, `drive/v3/files/${id}?alt=media&supportsAllDrives=true`)).text();
+  else if (converte && +(m.size || 0) < 20e6) {
+    // PDF e Word: faz uma cópia temporária convertida em documento do Google, lê o texto e apaga a cópia
+    const copia = await (await G(conta, `drive/v3/files/${id}/copy?supportsAllDrives=true&fields=id`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "vanessa-leitura-temporaria", mimeType: "application/vnd.google-apps.document" }) })).json();
+    try { texto = await (await G(conta, `drive/v3/files/${copia.id}/export?mimeType=text%2Fplain`)).text(); }
+    finally { await fetch(`https://www.googleapis.com/drive/v3/files/${copia.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${await acesso(conta)}` } }).catch(() => {}); }
+  }
   else return { nome: m.name, tipo: TIPO[m.mimeType] || m.mimeType, link: m.webViewLink, aviso: "Esse tipo de arquivo eu não consigo ler por dentro; só tenho o link." };
-  return { nome: m.name, tipo: TIPO[m.mimeType] || m.mimeType, link: m.webViewLink, conteudo: texto.slice(0, 9000), cortado: texto.length > 9000 };
+  const LIM = 25000;
+  return { nome: m.name, tipo: TIPO[m.mimeType] || m.mimeType, link: m.webViewLink, conteudo: texto.slice(0, LIM), cortado: texto.length > LIM, aviso: texto.length > LIM ? `O arquivo tem ${texto.length} caracteres; li os primeiros ${LIM}.` : undefined };
 }
 
 // tudo que a Vanessa salva fica na pasta "Vanessa" de cada Drive (criada por ela)
