@@ -49,7 +49,7 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 @media (max-width:600px){.sub{display:none}}
 
 /* JANELA: o painel holográfico onde a Vanessa mostra textos */
-#janela{position:fixed;z-index:5;top:84px;bottom:150px;right:max(3vw,16px);width:min(520px,44vw);display:flex;flex-direction:column;
+#janela{position:fixed;z-index:5;top:76px;bottom:120px;right:max(3vw,16px);width:min(520px,44vw);display:flex;flex-direction:column;
   background:linear-gradient(160deg,rgba(8,28,34,.92),rgba(3,12,16,.94) 60%);border:1px solid rgba(255,164,54,.38);border-radius:18px;
   box-shadow:0 0 0 1px rgba(63,212,230,.08) inset,0 30px 80px rgba(0,0,0,.6),0 0 60px rgba(255,140,40,.12);backdrop-filter:blur(14px);
   opacity:0;transform:translateX(30px) scale(.97);filter:blur(6px);pointer-events:none;transition:opacity .45s,transform .55s cubic-bezier(.2,.9,.25,1.1),filter .45s;overflow:hidden}
@@ -88,6 +88,7 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 #feixe{position:fixed;z-index:4;height:2px;pointer-events:none;transform-origin:0 50%;background:linear-gradient(90deg,rgba(255,208,138,0),rgba(255,208,138,.9),rgba(63,212,230,.7));filter:drop-shadow(0 0 6px rgba(255,164,54,.8));opacity:0;transition:opacity .5s}
 body.comjanela #feixe{opacity:.75}
 #nos .no{transition:opacity .5s}body.comjanela #nos .no.dir{opacity:.12}
+@media (max-height:720px){.jtopo{padding:16px 22px 10px}.jcorpo{padding:12px 24px 14px;font-size:15px}.jbase{padding:10px 16px 12px}.jdica{display:none}}
 @media (max-width:900px){#janela{left:12px;right:12px;width:auto;top:auto;bottom:150px;height:58vh}#feixe{display:none}}
 </style>
 </head>
