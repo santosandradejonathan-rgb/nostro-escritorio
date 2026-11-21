@@ -294,6 +294,142 @@ async function adsOrcamento(a: any) {
   return { ok: true, nome: info.name, antes_reais_dia: antes / 100, agora_reais_dia: valor / 100 };
 }
 
+/* ---------- criar anúncio (sempre nasce PAUSADO; só roda quando o Jonathan aprovar e mandar ativar) ---------- */
+const TETO_DIA = +(Deno.env.get("ADS_TETO_DIARIO") || "100"); // reais por dia; acima disso a Vanessa não cria
+const CTA_OK = ["LEARN_MORE", "SIGN_UP", "SHOP_NOW", "CONTACT_US", "BOOK_TRAVEL", "GET_QUOTE", "SUBSCRIBE", "APPLY_NOW", "DOWNLOAD", "WHATSAPP_MESSAGE", "MESSAGE_PAGE", "INSTAGRAM_MESSAGE", "CALL_NOW", "ORDER_NOW", "GET_OFFER"];
+async function igDaPagina(p: any): Promise<string> {
+  try { return (await g(p.id, { fields: "instagram_business_account" }, "GET", p.access_token)).instagram_business_account?.id || ""; } catch (_e) { return ""; }
+}
+const UF: Record<string, string> = { ac: "acre", al: "alagoas", ap: "amapa", am: "amazonas", ba: "bahia", ce: "ceara", df: "distrito federal", es: "espirito santo", go: "goias", ma: "maranhao", mt: "mato grosso", ms: "mato grosso do sul", mg: "minas gerais", pa: "para", pb: "paraiba", pr: "parana", pe: "pernambuco", pi: "piaui", rj: "rio de janeiro", rn: "rio grande do norte", rs: "rio grande do sul", ro: "rondonia", rr: "roraima", sc: "santa catarina", sp: "sao paulo", se: "sergipe", to: "tocantins" };
+async function cidadesAlvo(nomes: string[], raio: number) {
+  const out: any[] = [];
+  for (const nome of nomes.slice(0, 10)) {
+    const r = await g("search", { type: "adgeolocation", location_types: JSON.stringify(["city"]), q: nome.split(",")[0].trim(), country_code: "BR", limit: "5" });
+    const lista = r.data || [];
+    const uf = norm(nome.split(",")[1] || ""), estado = UF[uf] || uf;
+    const achou = (estado ? lista.find((x: any) => norm(x.region || "") === estado) : null) || lista.find((x: any) => x.type === "city") || lista[0];
+    if (!achou) throw new Error(`Não achei a cidade "${nome}" no Gerenciador de Anúncios.`);
+    out.push({ key: achou.key, nome: `${achou.name}, ${achou.region}`, ...(raio ? { radius: raio, distance_unit: "kilometer" } : {}) });
+  }
+  return out;
+}
+async function sobeImagem(contaId: string, url: string): Promise<string> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Não consegui baixar a imagem do anúncio.");
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const j = await g(`${contaId}/adimages`, { bytes: btoa(bin) }, "POST");
+  const img: any = Object.values(j.images || {})[0];
+  if (!img?.hash) throw new Error("O Facebook não aceitou a imagem.");
+  return img.hash;
+}
+async function sobeVideo(contaId: string, url: string): Promise<{ id: string; capa: string }> {
+  const v = await g(`${contaId}/advideos`, { file_url: url }, "POST");
+  for (let i = 0; i < 24; i++) { // espera o Facebook processar (até uns 2 minutos)
+    await new Promise((r) => setTimeout(r, 5000));
+    const s = await g(v.id, { fields: "status,picture" }).catch(() => ({} as any));
+    if (s.status?.video_status === "ready" && s.picture) return { id: v.id, capa: s.picture };
+    if (s.status?.video_status === "error") throw new Error("O Facebook não conseguiu processar o vídeo.");
+  }
+  throw new Error("O vídeo ainda está processando no Facebook. Tente criar o anúncio de novo em alguns minutos.");
+}
+async function adsCriar(a: any) {
+  const tipo = String(a.tipo || "");
+  if (!["mensagens", "impulsionar", "trafego", "cadastro"].includes(tipo)) return { erro: "O tipo precisa ser mensagens, impulsionar, trafego ou cadastro." };
+  const c = await conta(a.conta);
+  if (c.account_status !== 1) return { erro: `A conta "${c.name}" não está ativa (${STATUS_CONTA[c.account_status] || c.account_status}).` };
+  const p = await pagina(a.pagina);
+  const dia = Math.round(+String(a.orcamento_diario || "").replace(",", ".") * 100);
+  if (!(dia >= 600)) return { erro: "Falta o orçamento diário em reais (mínimo R$ 6 por dia)." };
+  if (dia > TETO_DIA * 100) return { erro: `O teto combinado é R$ ${TETO_DIA} por dia por anúncio novo. Acima disso, o Jonathan faz direto no Gerenciador (ou muda o teto).` };
+  const dias = Math.round(+a.dias || 0);
+  const nome = curto(a.nome || `Vanessa · ${tipo} · ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`, 120);
+  const ig = await igDaPagina(p);
+
+  // público
+  const cidades = (Array.isArray(a.cidades) ? a.cidades : a.cidades ? String(a.cidades).split(";") : ["Montes Claros, MG"]).map((x: any) => String(x).trim()).filter(Boolean);
+  const raio = a.raio_km ? Math.min(80, Math.max(17, Math.round(+a.raio_km))) : 0;
+  const geo = cidades.some((x: string) => norm(x) === "brasil") ? { countries: ["BR"] } : { cities: await cidadesAlvo(cidades, raio) };
+  const targeting: any = { geo_locations: { ...geo, location_types: ["home", "recent"] }, age_min: Math.max(18, Math.round(+a.idade_min || 18)), age_max: Math.min(65, Math.round(+a.idade_max || 65)), targeting_automation: { advantage_audience: 0 } };
+  if (a.genero === "mulheres") targeting.genders = [2]; else if (a.genero === "homens") targeting.genders = [1];
+
+  // objetivo e otimização
+  const destinoMsg = String(a.destino_mensagens || "whatsapp");
+  const cfg: any = {
+    mensagens: { objetivo: "OUTCOME_ENGAGEMENT", otimiza: "CONVERSATIONS", destino: destinoMsg === "direct" ? "INSTAGRAM_DIRECT" : destinoMsg === "messenger" ? "MESSENGER" : "WHATSAPP" },
+    impulsionar: { objetivo: "OUTCOME_AWARENESS", otimiza: "REACH" },
+    trafego: { objetivo: "OUTCOME_TRAFFIC", otimiza: "LINK_CLICKS", destino: "WEBSITE" },
+    cadastro: { objetivo: "OUTCOME_LEADS", otimiza: "LEAD_GENERATION", destino: "ON_AD" },
+  }[tipo];
+  if (tipo === "trafego" && !/^https?:\/\//.test(String(a.link || ""))) return { erro: "Para tráfego, falta o link de destino (site ou perfil)." };
+  if (tipo === "mensagens" && destinoMsg === "direct" && !ig) return { erro: `A página "${p.name}" não tem Instagram conectado, então não dá para anúncio de Direct.` };
+
+  // formulário (cadastro): usa um formulário que já existe na página
+  let formId = "";
+  if (tipo === "cadastro") {
+    const fs = (await g(`${p.id}/leadgen_forms`, { fields: "id,name,status", limit: "50" }, "GET", p.access_token)).data || [];
+    const ativos = fs.filter((x: any) => x.status === "ACTIVE");
+    const f = a.formulario ? ativos.find((x: any) => norm(x.name).includes(norm(a.formulario)) || x.id === String(a.formulario)) : ativos.length === 1 ? ativos[0] : null;
+    if (!f) return { erro: ativos.length ? `Diga qual formulário usar. Formulários ativos da página: ${ativos.map((x: any) => x.name).join(", ")}.` : `A página "${p.name}" não tem formulário de cadastro ativo. Crie o formulário no Gerenciador primeiro.` };
+    formId = f.id;
+  }
+
+  // criativo
+  const texto = String(a.texto || "").slice(0, 2000), titulo = curto(a.titulo || "", 60);
+  const arquivo = String(a.arquivo_url || "").trim();
+  let criativo: Record<string, string> = {};
+  if (tipo === "impulsionar") {
+    const post = String(a.post_id || "").trim();
+    if (!post) return { erro: "Para impulsionar, falta o post_id (do ig_perfil para Instagram, ou do fb_posts para Facebook)." };
+    if (post.includes("_")) criativo = { object_story_id: post };
+    else { if (!ig) return { erro: `A página "${p.name}" não tem Instagram conectado.` }; criativo = { object_id: p.id, instagram_user_id: ig, source_instagram_media_id: post }; }
+  } else {
+    if (!/^https:\/\//.test(arquivo)) return { erro: "Falta a imagem ou o vídeo do anúncio (link do drive_link_publico)." };
+    if (!texto) return { erro: "Falta o texto do anúncio." };
+    const ctaTipo = CTA_OK.includes(String(a.botao || "")) ? String(a.botao) : tipo === "mensagens" ? (destinoMsg === "direct" ? "INSTAGRAM_MESSAGE" : destinoMsg === "messenger" ? "MESSAGE_PAGE" : "WHATSAPP_MESSAGE") : tipo === "cadastro" ? "SIGN_UP" : "LEARN_MORE";
+    const valor: any = tipo === "mensagens" ? { app_destination: cfg.destino === "INSTAGRAM_DIRECT" ? "INSTAGRAM_DIRECT" : cfg.destino === "MESSENGER" ? "MESSENGER" : "WHATSAPP" } : tipo === "cadastro" ? { lead_gen_form_id: formId } : { link: a.link };
+    const link = tipo === "trafego" ? String(a.link) : tipo === "cadastro" ? "http://fb.me/" : cfg.destino === "MESSENGER" ? "https://fb.com/messenger_doc/" : cfg.destino === "INSTAGRAM_DIRECT" ? "https://www.instagram.com/" : "https://api.whatsapp.com/send";
+    const cta = { type: ctaTipo, value: valor };
+    const spec: any = { page_id: p.id, ...(ig ? { instagram_user_id: ig } : {}) };
+    if (/\.(mp4|mov)(\?|$)/i.test(arquivo)) {
+      const v = await sobeVideo(c.id, arquivo);
+      spec.video_data = { video_id: v.id, image_url: v.capa, message: texto, ...(titulo ? { title: titulo } : {}), call_to_action: { type: ctaTipo, value: { ...valor, link } } };
+    } else {
+      const hash = await sobeImagem(c.id, arquivo);
+      spec.link_data = { image_hash: hash, message: texto, link, ...(titulo ? { name: titulo } : {}), call_to_action: cta };
+    }
+    criativo = { object_story_spec: JSON.stringify(spec) };
+  }
+
+  // monta tudo; se algo falhar no meio, apaga o que foi criado
+  let campanha = "";
+  try {
+    campanha = (await g(`${c.id}/campaigns`, { name: nome, objective: cfg.objetivo, status: "PAUSED", special_ad_categories: "[]", daily_budget: String(dia), bid_strategy: "LOWEST_COST_WITHOUT_CAP" }, "POST")).id;
+    const conj: Record<string, string> = { name: nome + " · público", campaign_id: campanha, billing_event: "IMPRESSIONS", optimization_goal: cfg.otimiza, targeting: JSON.stringify(targeting), status: "ACTIVE" };
+    if (cfg.destino) conj.destination_type = cfg.destino;
+    if (tipo === "mensagens" || tipo === "cadastro") conj.promoted_object = JSON.stringify({ page_id: p.id });
+    if (dias > 0) conj.end_time = String(Math.floor(Date.now() / 1000) + dias * 86400);
+    const conjunto = (await g(`${c.id}/adsets`, conj, "POST")).id;
+    const cr = (await g(`${c.id}/adcreatives`, { name: nome + " · criativo", ...criativo }, "POST")).id;
+    const anuncio = (await g(`${c.id}/ads`, { name: nome + " · anúncio", adset_id: conjunto, creative: JSON.stringify({ creative_id: cr }), status: "ACTIVE" }, "POST")).id;
+    let previa = "";
+    try { const pv = await g(`${anuncio}/previews`, { ad_format: ig ? "INSTAGRAM_STANDARD" : "MOBILE_FEED_STANDARD" }); previa = (String(pv.data?.[0]?.body || "").match(/src="([^"]+)"/) || [])[1]?.replace(/&amp;/g, "&") || ""; } catch (_e) { /* sem prévia */ }
+    await registra("ads_criar", `${c.name} · ${nome} (${campanha})`, "", `PAUSADA · ${tipo} · R$ ${dia / 100}/dia${dias ? ` · ${dias} dias` : ""}`, true);
+    return {
+      ok: true, situacao: "CRIADA PAUSADA: não está gastando nada. Só roda depois que o Jonathan aprovar e mandar ativar (ads_status ativar com o id da campanha).",
+      conta: c.name, pagina: p.name, campanha_id: campanha, conjunto_id: conjunto, anuncio_id: anuncio, nome, tipo,
+      orcamento_reais_dia: dia / 100, dias: dias || "sem data para acabar", publico: { lugares: (geo as any).cities ? (geo as any).cities.map((x: any) => x.nome + (x.radius ? ` (+${x.radius} km)` : "")) : ["Brasil"], idade: `${targeting.age_min} a ${targeting.age_max}`, genero: a.genero || "todos" },
+      previa_link: previa || undefined, gerenciador: `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${c.id.replace("act_", "")}&selected_campaign_ids=${campanha}`,
+      aviso: "A Meta ainda revisa o anúncio; isso pode levar algumas horas depois de ativar.",
+    };
+  } catch (e) {
+    const msg = String((e as Error).message || e);
+    if (campanha) { try { await g(campanha, {}, "DELETE"); } catch (_e) { /* fica pausada */ } }
+    await registra("ads_criar", `${c.name} · ${nome}`, "", tipo, false, msg);
+    return { erro: "Não consegui criar o anúncio: " + msg + (campanha ? " (apaguei o que tinha começado a criar, nada ficou no ar)" : "") };
+  }
+}
+
 async function status() {
   await token();
   const dias = MEM ? Math.floor((MEM.expira - Date.now()) / 864e5) : null;
@@ -311,7 +447,7 @@ Deno.serve(async (req) => {
     const mapa: Record<string, (a: any) => Promise<unknown>> = {
       meta_status: status, fb_paginas: fbPaginas, fb_posts: fbPosts, fb_numeros: fbNumeros, fb_comentarios: fbComentarios, fb_mensagens: fbMensagens,
       fb_responder_comentario: fbResponderComentario, fb_responder_mensagem: fbResponderMensagem, fb_publicar: fbPublicar,
-      ads_contas: adsContas, ads_resultados: adsResultados, ads_campanhas: adsCampanhas, ads_status: adsStatus, ads_orcamento: adsOrcamento,
+      ads_contas: adsContas, ads_resultados: adsResultados, ads_campanhas: adsCampanhas, ads_status: adsStatus, ads_orcamento: adsOrcamento, ads_criar: adsCriar,
     };
     if (!mapa[f]) return json({ erro: "ferramenta desconhecida" });
     const out: any = await mapa[f](a);
