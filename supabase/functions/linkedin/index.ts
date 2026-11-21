@@ -5,7 +5,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const URL_SB = Deno.env.get("SUPABASE_URL") || "";
 const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CID = (Deno.env.get("LINKEDIN_CLIENT_ID") || "").trim();
+// o ID do app (Nostro Agência) é público: aparece no link de autorização; a chave secreta fica só no segredo
+const CID = (Deno.env.get("LINKEDIN_CLIENT_ID") || "77iva3zm1bvufa").trim();
 const SEC = (Deno.env.get("LINKEDIN_CLIENT_SECRET") || "").trim();
 const REDIR = "https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/linkedin";
 const PAGINA = "https://santosandradejonathan-rgb.github.io/nostro-escritorio/linkedin.html";
