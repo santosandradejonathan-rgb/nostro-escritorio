@@ -28,7 +28,7 @@ header{flex:none;display:flex;align-items:center;gap:12px;padding:calc(env(safe-
 .nm{font:700 21px/1 Rajdhani,sans-serif;letter-spacing:.08em}
 .st{font:600 12px/1 Rajdhani,sans-serif;letter-spacing:.12em;color:var(--mut);margin-top:5px;text-transform:uppercase}
 .st.ativo{color:var(--or2)}
-#nova{margin-left:auto;background:none;border:1px solid var(--linha);color:var(--or2);font:600 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:8px 11px;border-radius:9px}
+#nova{background:none;border:1px solid var(--linha);color:var(--or2);font:600 12px Rajdhani,sans-serif;letter-spacing:.12em;padding:8px 11px;border-radius:9px}
 #lista{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 14px 8px;display:flex;flex-direction:column;gap:10px;overscroll-behavior:contain}
 .dia{align-self:center;font:600 11px Rajdhani,sans-serif;letter-spacing:.14em;color:var(--mut);padding:4px 10px;border:1px solid rgba(143,161,167,.2);border-radius:20px;margin:6px 0}
 .m{max-width:84%;padding:9px 13px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;font-size:15.5px;line-height:1.45;animation:entra .22s ease-out}
@@ -87,6 +87,35 @@ body.gravando #grav{display:flex} body.gravando .barra{display:none}
 #rel{font:700 15px Rajdhani,sans-serif;letter-spacing:.08em;color:#ffd7d8;flex:none;width:38px}
 #vivo{flex:1;display:flex;align-items:center;gap:2px;height:26px;overflow:hidden;justify-content:flex-end}
 #vivo b{width:3px;flex:none;border-radius:2px;background:#ff8f92}
+/* ligação */
+#ligar{background:var(--or);border:0;color:#1b1206;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:none}
+#ligar svg{width:20px;height:20px}
+#nova{margin-left:auto}
+#call{position:fixed;inset:0;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 28px) 24px calc(env(safe-area-inset-bottom) + 30px);
+  background:radial-gradient(90% 55% at 50% 38%,rgba(255,164,54,.16),transparent 70%),#030f13;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+body.ligado #call{display:flex}
+.ctop{text-align:center}
+.ctop b{display:block;font:700 30px/1 Rajdhani,sans-serif;letter-spacing:.12em}
+#ctempo{font:600 16px Rajdhani,sans-serif;letter-spacing:.14em;color:var(--mut);margin-top:8px}
+.cmeio{display:flex;flex-direction:column;align-items:center;gap:26px;width:100%}
+.anel{position:relative;width:min(62vw,250px);aspect-ratio:1}
+.anel img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid var(--or);z-index:2}
+.anel i{position:absolute;inset:0;border-radius:50%;border:2px solid var(--or);opacity:0}
+#call.falando .anel i{animation:onda 1.6s infinite ease-out}#call.falando .anel i:nth-child(2){animation-delay:.53s}#call.falando .anel i:nth-child(3){animation-delay:1.06s}
+#call.ouvindo .anel img{border-color:var(--cy);box-shadow:0 0 0 calc(var(--nv,0)*22px) rgba(63,212,230,.28),0 0 40px rgba(63,212,230,.35)}
+#call.pensando .anel img{animation:resp 1.4s infinite ease-in-out}
+#cest{font:700 26px/1.15 Rajdhani,sans-serif;letter-spacing:.14em;text-align:center;color:var(--or2);min-height:60px}
+#call.ouvindo #cest{color:var(--cy)}
+#cdica{font-size:14px;color:var(--mut);text-align:center;max-width:300px;min-height:40px}
+.cbaixo{display:flex;align-items:center;justify-content:center;gap:42px}
+.cb2{width:74px;height:74px;border-radius:50%;border:0;display:grid;place-items:center}
+.cb2 svg{width:32px;height:32px}
+#cmudo{background:#123039;color:#d5e3e7;border:1px solid rgba(143,161,167,.35)}
+#cmudo.on{background:#EAF2F4;color:#04161b}
+#cdesl{width:86px;height:86px;background:#e5484d;color:#fff;box-shadow:0 8px 30px rgba(229,72,77,.4)}
+#cdesl svg{width:38px;height:38px;transform:rotate(135deg)}
+@keyframes onda{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.55);opacity:0}}
+@keyframes resp{50%{transform:scale(.96);opacity:.8}}
 @keyframes pisca{50%{opacity:.4}}
 @keyframes dig{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
 @keyframes entra{from{opacity:0;transform:translateY(6px)}}
@@ -98,6 +127,7 @@ body.gravando #grav{display:flex} body.gravando .barra{display:none}
   <div class="av"><img src="assets/vanessa-rosto.jpg" alt=""><i></i></div>
   <div><div class="nm">VANESSA IA</div><div class="st" id="st">ONLINE</div></div>
   <button id="nova" type="button">NOVA CONVERSA</button>
+  <button id="ligar" type="button" aria-label="Ligar para a Vanessa"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></button>
 </header>
 <div id="lista"></div>
 <footer>
@@ -113,9 +143,17 @@ body.gravando #grav{display:flex} body.gravando .barra{display:none}
     <button class="bt" id="env" type="button" aria-label="Enviar" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12 2-12 2z"/></svg></button>
   </div>
 </footer>
+<div id="call" aria-live="polite">
+  <div class="ctop"><b>VANESSA IA</b><div id="ctempo">LIGANDO...</div></div>
+  <div class="cmeio"><div class="anel"><i></i><i></i><i></i><img src="assets/vanessa-rosto.jpg" alt=""></div><div id="cest">CONECTANDO</div><div id="cdica"></div></div>
+  <div class="cbaixo">
+    <button class="cb2" id="cmudo" type="button" aria-label="Silenciar microfone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+    <button class="cb2" id="cdesl" type="button" aria-label="Desligar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg></button>
+  </div>
+</div>
 <script>
 const SUPA='https://isfyxyoelqmncqxcrvlx.supabase.co',KEY='sb_publishable_Y04pYZRNwX75XI8E29qL8w_TFTmrE4Z';
-const FN_AGENTE=SUPA+'/functions/v1/agente',FN_TR=SUPA+'/functions/v1/transcrever',AG='calebe',PESSOA='jonathan';
+const FN_AGENTE=SUPA+'/functions/v1/agente',FN_TR=SUPA+'/functions/v1/transcrever',FN_VOZ=SUPA+'/functions/v1/voz',AG='calebe',PESSOA='jonathan';
 const lista=document.getElementById('lista'),txt=document.getElementById('txt'),env=document.getElementById('env'),mic=document.getElementById('mic'),st=document.getElementById('st'),aviso=document.getElementById('aviso');
 const GUARDA='vanessa-chat-v1',PAUSA=6*3600e3;
 let H={msgs:[],ini:null};try{H=JSON.parse(localStorage.getItem(GUARDA))||H}catch(e){}
@@ -252,6 +290,124 @@ function terminaGravar(enviar){
 mic.onclick=comecaGravar;
 document.getElementById('envA').onclick=()=>terminaGravar(true);
 document.getElementById('lixo').onclick=()=>terminaGravar(false);
+
+
+// ---------- LIGAÇÃO: fala, ela entende quando você parou, responde em voz e volta a ouvir ----------
+const callEl=document.getElementById('call'),cest=document.getElementById('cest'),cdica=document.getElementById('cdica'),ctempo=document.getElementById('ctempo'),cmudo=document.getElementById('cmudo');
+let L=null; // a ligação em andamento
+let VOZ_ESC='';fetch(SUPA+'/rest/v1/escritorio_vozes?select=voz&agente=eq.'+AG,{headers:{apikey:KEY}}).then(r=>r.json()).then(j=>{if(j&&j[0])VOZ_ESC=j[0].voz}).catch(()=>{});
+const cfase=(f,t,d)=>{if(!L)return;L.fase=f;callEl.className=f;cest.textContent=t;cdica.textContent=d||''};
+function bip(freq,dur,vol){if(!L||!L.ctx)return;try{const o=L.ctx.createOscillator(),g=L.ctx.createGain();o.frequency.value=freq;g.gain.setValueAtTime(vol||.07,L.ctx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,L.ctx.currentTime+dur);o.connect(g);g.connect(L.ctx.destination);o.start();o.stop(L.ctx.currentTime+dur)}catch(e){}}
+async function telaAcesa(){try{if(L&&'wakeLock' in navigator&&document.visibilityState==='visible')L.wake=await navigator.wakeLock.request('screen')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(L&&document.visibilityState==='visible'){telaAcesa();if(L.ctx&&L.ctx.state!=='running')L.ctx.resume().catch(()=>{})}});
+async function ligar(){
+  if(L||ocupado)return;const tipo=tipoAudio();
+  if(tipo===null){aviso.textContent='ESTE NAVEGADOR NÃO GRAVA ÁUDIO';setTimeout(()=>{aviso.textContent=''},4000);return}
+  const C=window.AudioContext||window.webkitAudioContext;
+  L={ctx:new C(),tipo,fase:'',mudo:false,ini:Date.now(),fila:null,fonte:null,gen:0,msgsIni:null};
+  document.body.classList.add('ligado');cfase('','CONECTANDO');telaAcesa();
+  try{L.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}
+  catch(e){cfase('','MICROFONE BLOQUEADO','Libere o microfone para este site nas configurações do navegador.');setTimeout(desligar,3500);return}
+  if(!L)return;
+  const src=L.ctx.createMediaStreamSource(L.stream);L.an=L.ctx.createAnalyser();L.an.fftSize=1024;src.connect(L.an);L.buf=new Float32Array(L.an.fftSize);
+  L.relogio=setInterval(()=>{if(L)ctempo.textContent=mmss((Date.now()-L.ini)/1000)},1000);
+  const agora=Date.now(),ultima=H.msgs.length?H.msgs[H.msgs.length-1].t:0;
+  if(!H.ini||agora-ultima>PAUSA)H.ini=new Date(agora).toISOString();
+  bip(660,.18);setTimeout(()=>bip(880,.22),190);
+  L.piso=.006;setTimeout(ouvirL,450);
+}
+function desligar(){
+  if(!L)return;const l=L;L=null;l.gen++;
+  clearInterval(l.relogio);clearInterval(l.vad);try{l.rec&&l.rec.state!=='inactive'&&l.rec.stop()}catch(e){}
+  if(l.ctl)try{l.ctl.abort()}catch(e){}
+  try{l.fonte&&l.fonte.stop()}catch(e){}
+  try{l.stream&&l.stream.getTracks().forEach(t=>t.stop())}catch(e){}
+  try{l.wake&&l.wake.release()}catch(e){}
+  setTimeout(()=>{try{l.ctx.close()}catch(e){}},400);
+  document.body.classList.remove('ligado');callEl.className='';ctempo.textContent='LIGANDO...';status('ONLINE');ocupado=false;ajusta();desenha()}
+function nivelMic(){L.an.getFloatTimeDomainData(L.buf);let q=0;for(const x of L.buf)q+=x*x;return Math.sqrt(q/L.buf.length)}
+// ouve até você parar de falar (percebe o silêncio sozinha)
+function ouvirL(){
+  if(!L)return;const g=++L.gen;
+  if(L.mudo){cfase('','MICROFONE MUDO','Toque no microfone para voltar a falar.');return}
+  cfase('ouvindo','PODE FALAR','');
+  let pedacos=[],rec=null,falou=0,silencio=0,inicioFala=0,acima=0;
+  const novo=()=>{pedacos=[];rec=L.tipo?new MediaRecorder(L.stream,{mimeType:L.tipo,audioBitsPerSecond:32000}):new MediaRecorder(L.stream);L.rec=rec;rec.ondataavailable=e=>{if(e.data&&e.data.size)pedacos.push(e.data)};rec.start(250);L.recIni=Date.now()};
+  novo();
+  clearInterval(L.vad);
+  L.vad=setInterval(()=>{
+    if(!L||L.gen!==g){return}
+    const v=nivelMic(),lim=Math.max(.018,L.piso*3.2);
+    callEl.style.setProperty('--nv',Math.min(1,v/(lim*3)).toFixed(2));
+    if(!falou){
+      L.piso=L.piso*.97+Math.min(v,.05)*.03; // aprende o barulho do carro
+      if(v>lim){acima+=50;if(acima>=150){falou=1;inicioFala=Date.now();silencio=0;cdica.textContent='Ouvindo...'}}else acima=0;
+      // sem fala por muito tempo: recomeça a gravação para não acumular silêncio
+      if(!falou&&Date.now()-L.recIni>15000){const r=rec;r.onstop=null;try{r.stop()}catch(e){}novo()}
+    }else{
+      if(v<lim*.75)silencio+=50;else silencio=0;
+      const dur=Date.now()-inicioFala;
+      if((silencio>=1300&&dur>500)||dur>45000){clearInterval(L.vad);fechaFala(rec,()=>pedacos,g)}
+    }},50);
+}
+function fechaFala(rec,pegaPedacos,g){
+  bip(520,.12,.05);cfase('pensando','ENTENDENDO...','');
+  rec.onstop=async()=>{
+    if(!L||L.gen!==g)return;
+    const blob=new Blob(pegaPedacos(),{type:(rec.mimeType||'audio/webm').split(';')[0]});
+    let texto='';try{const r=await fetch(FN_TR,{method:'POST',headers:{'Content-Type':blob.type||'audio/webm'},body:blob});const j=await r.json();texto=String(j.texto||'').trim()}catch(e){}
+    if(!L||L.gen!==g)return;
+    if(!texto||texto.length<2){ouvirL();return} // barulho: volta a ouvir
+    perguntaL(texto,g)};
+  try{rec.stop()}catch(e){rec.onstop()}
+}
+const abrev=t=>t.replace(/\bDra\./g,'Doutora').replace(/\bDr\./g,'Doutor').replace(/\bSra\./g,'Senhora').replace(/\bSr\./g,'Senhor').replace(/\s&\s/g,' e ').replace(/R\$\s?/g,'').replace(/https?:\/\/\S+/g,'');
+function vozDe(t){return fetch(FN_VOZ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:AG,texto:t,voz:VOZ_ESC||undefined})}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b&&L?L.ctx.decodeAudioData(b):null).catch(()=>null)}
+function falaL(f,t){t=abrev(t).trim();if(!t||!L||L.fila!==f)return;f.itens.push(vozDe(t));if(!f.tocando)tocaL(f)}
+async function tocaL(f){if(!L||L.fila!==f)return;const p=f.itens.shift();if(!p){f.tocando=false;if(f.acabou)fimFalaL(f);else cfase('pensando','TRABALHANDO...','Ela está consultando. Já responde.');return}f.tocando=true;
+  const b=await p;if(!L||L.fila!==f)return;if(!b){tocaL(f);return}
+  if(L.ctx.state!=='running')try{await L.ctx.resume()}catch(e){}
+  const s=L.ctx.createBufferSource();s.buffer=b;s.connect(L.ctx.destination);L.fonte=s;
+  if(L.fase!=='falando')cfase('falando','VANESSA FALANDO','Toque na tela para interromper.');
+  s.onended=()=>{if(L&&L.fonte===s)L.fonte=null;tocaL(f)};s.start()}
+function fimFalaL(f){if(!L||L.fila!==f)return;L.fila=null;if(L.tchau){setTimeout(desligar,300);return}setTimeout(()=>{if(L&&!L.fila)ouvirL()},250)}
+async function perguntaL(texto,g){
+  if(!L)return;const agora=Date.now();
+  if(!H.msgs.length)lista.innerHTML='';
+  const msg={role:'user',content:texto,t:agora,lig:1};H.msgs.push(msg);salva();memAdd('u','(ligação) '+texto);
+  L.tchau=/^(tchau|at[eé] (mais|logo|amanh[aã]|depois)|pode desligar|desliga|valeu,? tchau|falou,? tchau|beijo,? tchau)\b/i.test(texto);
+  cfase('pensando','PENSANDO...','“'+texto.slice(0,110)+(texto.length>110?'…':'')+'”');
+  const desde=Date.parse(H.ini);
+  const enviar=H.msgs.filter(m=>m.t>=desde).slice(-20).map(m=>({role:m.role,content:m.role==='user'?m.content:(m.fala||'')+(m.usou&&m.usou.length?'\n(ferramentas usadas: '+m.usou.join(', ')+')':'')+(m.telas||[]).map(j=>'\n\n(Deixei no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join('')}));
+  const ctl=new AbortController();L.ctl=ctl;const f={itens:[],tocando:false,acabou:false};L.fila=f;
+  let fala='',pend='',quadro=null;const telas=[],usadas=[];
+  try{
+    const r=await fetch(FN_AGENTE,{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({agente:AG,canal:'ligacao',interlocutor:'Jonathan',pessoa:PESSOA,inicio:H.ini,sala:'ligação pelo celular',mensagens:enviar,stream:true})});
+    if(!r.ok||!r.body)throw new Error('sem resposta');
+    const rd=r.body.getReader(),dec=new TextDecoder();
+    for(;;){const {value,done}=await rd.read();if(!L||L.ctl!==ctl)return;if(done)break;let t='';
+      for(const ch of dec.decode(value,{stream:true})){
+        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);if(j.usou)usadas.push(...j.usou);else telas.push(j)}catch(e){}quadro=null}else quadro+=ch}
+        else if(ch==='\u001e')quadro='';else t+=ch}
+      fala+=t;pend+=t;let m;
+      while((m=pend.match(/^([\s\S]*?[.!?…])\s+/))&&m[1].trim().length>=8){falaL(f,m[1]);pend=pend.slice(m[0].length)}}
+    L.ctl=null;if(pend.trim())falaL(f,pend);fala=fala.trim();
+    if(!fala&&!telas.length)throw new Error('vazio');
+    const usou=[...new Set(usadas)];H.msgs.push({role:'assistant',fala,telas,usou,t:Date.now()});salva();
+    memAdd('a',fala+(usou.length?'\n(ferramentas usadas: '+usou.join(', ')+')':'')+telas.map(j=>'\n\n(Deixei no chat, no cartão "'+j.titulo+'":)\n'+j.texto).join(''));
+    f.acabou=true;if(!f.tocando&&!f.itens.length)fimFalaL(f);
+  }catch(e){
+    if(e.name==='AbortError'||!L)return;L.ctl=null;L.fila=null;H.msgs.pop();salva();
+    cfase('pensando','SEM CONEXÃO','Tentando de novo quando você falar.');bip(300,.3,.06);setTimeout(()=>{if(L)ouvirL()},1800)}
+}
+// tocar na tela enquanto ela fala ou pensa: interrompe e volta a ouvir
+callEl.addEventListener('pointerdown',e=>{if(!L||e.target.closest('.cb2'))return;
+  if(L.fase==='falando'||L.fase==='pensando'){L.gen++;if(L.ctl){try{L.ctl.abort()}catch(_){}L.ctl=null}L.fila=null;try{L.fonte&&L.fonte.stop()}catch(_){}L.fonte=null;L.tchau=false;ouvirL()}});
+document.getElementById('cdesl').onclick=()=>{bip(440,.25);desligar()};
+cmudo.onclick=()=>{if(!L)return;L.mudo=!L.mudo;cmudo.classList.toggle('on',L.mudo);
+  if(L.mudo){if(L.fase==='ouvindo'){L.gen++;clearInterval(L.vad);try{L.rec.onstop=null;L.rec.stop()}catch(e){}cfase('','MICROFONE MUDO','Toque no microfone para voltar a falar.')}}
+  else if(!L.fila&&L.fase!=='pensando')ouvirL()};
+document.getElementById('ligar').onclick=ligar;
 
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 desenha();ajusta();

@@ -180,7 +180,7 @@ Você não é uma assistente que só executa: você é uma profissional sênior 
 const COMUM = (interlocutor: string, sala: string, historico: string, agora: string, primeira: boolean, canal = "") => `
 
 # Onde você está
-${canal === "whatsapp" ? "Você está conversando por mensagem no WhatsApp com quem está falando, pelo celular. Ele pode estar na rua, sem computador. Quando ele manda áudio, chega aqui já transcrito." : canal === "chat" ? "Você está conversando por mensagem num chat no celular (o app da Vanessa), com quem está falando. Ele pode estar na rua, sem computador. Quando ele usa o microfone, a fala chega aqui já transcrita." : `Você conversa por voz numa janela no computador da Nostro (${sala}).`}
+${canal === "ligacao" ? "Você está numa LIGAÇÃO de voz pelo celular com quem está falando (o app da Vanessa, no modo ligação). Ele normalmente está DIRIGINDO: não pode ler, olhar a tela nem digitar. Tudo que você responde é falado em voz alta para ele, e o que ele fala chega aqui já transcrito." : canal === "whatsapp" ? "Você está conversando por mensagem no WhatsApp com quem está falando, pelo celular. Ele pode estar na rua, sem computador. Quando ele manda áudio, chega aqui já transcrito." : canal === "chat" ? "Você está conversando por mensagem num chat no celular (o app da Vanessa), com quem está falando. Ele pode estar na rua, sem computador. Quando ele usa o microfone, a fala chega aqui já transcrita." : `Você conversa por voz numa janela no computador da Nostro (${sala}).`}
 Agora quem está falando com você é ${interlocutor}. Se não for o Jonathan, trate como alguém do time da Nostro, por exemplo a Stephanie, sócia dele.
 Agora são ${agora} (horário de Brasília). Hoje é ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })} (ano-mês-dia).
 
@@ -207,7 +207,15 @@ ${historico}
 - Fale como colega de trabalho: frases curtas, espontâneas, com opinião própria. Pode concordar, discordar, comentar o dia e fazer uma piada leve quando couber.
 - Se não souber algo, diga que não sabe. Se a pessoa se despedir ou sair, responda só com uma despedida curta.
 
-${canal ? `# Formato ${canal === "whatsapp" ? "no WhatsApp" : "no chat do celular"} (vale mais que as regras de voz abaixo)
+${canal === "ligacao" ? `# Ligação: ele está dirigindo (vale mais que qualquer outra regra de formato)
+- Fale como numa ligação de telefone: frases curtas, no máximo 3 por resposta, e no máximo 3 números por resposta. Nada de lista falada.
+- Nunca peça para ele ler, olhar a tela, digitar, clicar ou abrir algo. Nunca fale link, e-mail inteiro nem id.
+- Texto para ele usar depois (copy, legenda, roteiro, mensagem, lista, relatório, números detalhados): use mostrar_na_tela; fica guardado no chat. Na fala, diga só que deixou no chat para ele ver quando parar o carro.
+- Quando for usar uma ferramenta, diga antes uma frase bem curta (\"Deixa eu ver aqui.\"), para ele saber que você está trabalhando.
+- As regras de confirmação continuam valendo: antes de publicar, responder alguém, mexer em anúncio ou na agenda, diga em voz exatamente o que vai fazer e espere ele falar \"pode\".
+- Se a frase chegar cortada ou sem sentido (barulho do carro), pergunte de novo em poucas palavras.
+
+` : canal ? `# Formato ${canal === "whatsapp" ? "no WhatsApp" : "no chat do celular"} (vale mais que as regras de voz abaixo)
 - Responda como mensagem de ${canal === "whatsapp" ? "WhatsApp" : "chat"}: curta, direta, até 3 frases. Pode quebrar linha. Sem markdown, sem asteriscos, sem listas longas.
 - Texto para ele usar (copy, legenda, roteiro, mensagem, lista, números detalhados): use mostrar_na_tela; o texto ${canal === "whatsapp" ? "vai como uma mensagem separada no WhatsApp" : "aparece logo abaixo como um cartão com botão de copiar"}, pronto para ele copiar. Na sua resposta, diga só uma frase sobre o que mandou.
 - Quando for usar uma ferramenta, não escreva nada antes de chamá-la: escreva só no fim, uma vez, já com o resultado. Nunca repita a mesma frase.
@@ -440,7 +448,7 @@ Deno.serve(async (req) => {
 
   const interlocutor = String(corpo.interlocutor || "Jonathan").slice(0, 60);
   const sala = String(corpo.sala || "Sala Comercial").slice(0, 60);
-  const canal = corpo.canal === "whatsapp" ? "whatsapp" : corpo.canal === "chat" ? "chat" : "";
+  const canal = ["whatsapp", "chat", "ligacao"].includes(corpo.canal) ? String(corpo.canal) : "";
   const pessoa = String(corpo.pessoa || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 40);
   const doBanco = await memoriaDe(String(corpo.agente || ""), pessoa, String(corpo.inicio || ""));
   const historico = (doBanco || String(corpo.historico || "") || "Nenhuma conversa anterior. É a primeira vez que vocês conversam.").slice(-12000);
