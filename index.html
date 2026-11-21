@@ -46,11 +46,54 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 @keyframes respira{50%{opacity:.35}}
 @keyframes pisca{50%{opacity:.35}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
-@media (max-width:600px){.sub{display:none}</style>
+@media (max-width:600px){.sub{display:none}}
+
+/* JANELA: o painel holográfico onde a Vanessa mostra textos */
+#janela{position:fixed;z-index:5;top:84px;bottom:150px;right:max(3vw,16px);width:min(520px,44vw);display:flex;flex-direction:column;
+  background:linear-gradient(160deg,rgba(8,28,34,.92),rgba(3,12,16,.94) 60%);border:1px solid rgba(255,164,54,.38);border-radius:18px;
+  box-shadow:0 0 0 1px rgba(63,212,230,.08) inset,0 30px 80px rgba(0,0,0,.6),0 0 60px rgba(255,140,40,.12);backdrop-filter:blur(14px);
+  opacity:0;transform:translateX(30px) scale(.97);filter:blur(6px);pointer-events:none;transition:opacity .45s,transform .55s cubic-bezier(.2,.9,.25,1.1),filter .45s;overflow:hidden}
+#janela.aberta{opacity:1;transform:none;filter:none;pointer-events:auto}
+#janela::before{content:"";position:absolute;left:0;right:0;top:-40%;height:40%;background:linear-gradient(to bottom,rgba(255,190,110,0),rgba(255,190,110,.09),rgba(255,190,110,0));pointer-events:none}
+#janela.aberta::before{animation:varre 1.1s ease-out}
+@keyframes varre{to{top:110%}}
+#janela .canto{position:absolute;width:18px;height:18px;border-color:var(--or2);border-style:solid;opacity:.85;pointer-events:none}
+#janela .c1{top:8px;left:8px;border-width:2px 0 0 2px;border-radius:6px 0 0 0}
+#janela .c2{top:8px;right:8px;border-width:2px 2px 0 0;border-radius:0 6px 0 0}
+#janela .c3{bottom:8px;left:8px;border-width:0 0 2px 2px;border-radius:0 0 0 6px}
+#janela .c4{bottom:8px;right:8px;border-width:0 2px 2px 0;border-radius:0 0 6px 0}
+.jtopo{display:flex;align-items:flex-start;gap:12px;padding:22px 24px 14px;border-bottom:1px solid rgba(255,164,54,.16)}
+.jselo{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(255,200,120,.35),rgba(255,140,40,.06));border:1px solid rgba(255,164,54,.5);color:var(--or2);font:700 15px Rajdhani,sans-serif}
+.jtit{font:700 20px/1.15 Rajdhani,sans-serif;letter-spacing:.07em;color:var(--ink);text-transform:uppercase}
+.jsub{font:600 12px/1 Rajdhani,sans-serif;letter-spacing:.12em;color:var(--mut);margin-top:6px}
+.jsub b{color:var(--cy);font-weight:600}
+.jfecha{margin-left:auto;flex:none;width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:var(--mut);font:400 20px/1 system-ui;cursor:pointer;display:grid;place-items:center;transition:all .2s}
+.jfecha:hover{color:var(--ink);border-color:var(--or)}
+.jcorpo{flex:1;overflow:auto;padding:18px 26px 22px;font:400 16px/1.7 Inter,system-ui,sans-serif;color:#dfe9ec;outline:none;white-space:pre-wrap;word-wrap:break-word;scrollbar-width:thin;scrollbar-color:rgba(255,164,54,.35) transparent}
+.jcorpo:focus{box-shadow:inset 0 0 0 1px rgba(63,212,230,.25)}
+.jcorpo .h{display:block;font:700 14px/1.3 Rajdhani,sans-serif;letter-spacing:.14em;color:var(--or2);margin:6px 0 2px}
+.jcorpo .li{display:block;padding-left:18px;position:relative}
+.jcorpo .li::before{content:"";position:absolute;left:3px;top:.72em;width:6px;height:6px;border-radius:50%;background:var(--or);box-shadow:0 0 8px var(--or)}
+.jcorpo .vazia{display:block;height:.6em}
+.jbase{display:flex;align-items:center;gap:10px;padding:14px 18px 18px;border-top:1px solid rgba(255,164,54,.16)}
+.jbt{border:1px solid rgba(255,164,54,.45);background:rgba(255,164,54,.07);color:var(--or2);font:700 14px/1 Rajdhani,sans-serif;letter-spacing:.12em;padding:11px 16px;border-radius:11px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.jbt:hover{background:rgba(255,164,54,.16);box-shadow:0 0 18px rgba(255,164,54,.25)}
+.jbt.prim{background:linear-gradient(180deg,#FFB24F,#F08A1C);color:#1b0f02;border-color:transparent}
+.jbt.prim:hover{box-shadow:0 0 24px rgba(255,164,54,.55)}
+.jbt.ok{background:rgba(63,212,230,.15);color:var(--cy);border-color:rgba(63,212,230,.5)}
+.jnav{margin-left:auto;display:flex;align-items:center;gap:6px;font:600 13px Rajdhani,sans-serif;letter-spacing:.1em;color:var(--mut)}
+.jnav button{width:30px;height:30px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:transparent;color:var(--ink);cursor:pointer;font:600 16px/1 system-ui}
+.jnav button:disabled{opacity:.25;cursor:default}
+.jdica{font:500 11px/1 Rajdhani,sans-serif;letter-spacing:.1em;color:#5f7379;padding:0 26px 10px;text-align:right}
+#feixe{position:fixed;z-index:4;height:2px;pointer-events:none;transform-origin:0 50%;background:linear-gradient(90deg,rgba(255,208,138,0),rgba(255,208,138,.9),rgba(63,212,230,.7));filter:drop-shadow(0 0 6px rgba(255,164,54,.8));opacity:0;transition:opacity .5s}
+body.comjanela #feixe{opacity:.75}
+#nos .no{transition:opacity .5s}body.comjanela #nos .no.dir{opacity:.12}
+@media (max-width:900px){#janela{left:12px;right:12px;width:auto;top:auto;bottom:150px;height:58vh}#feixe{display:none}}
+</style>
 </head>
 <body>
 <main>
-<svg viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Retrato da androide Vanessa no centro, ligado por circuitos ao Nostro Hub, Busca de leads, Instagram, Canva, Google Drive, WhatsApp, Gmail e Agenda">
+<svg viewBox="0 0 1672 941" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Retrato da androide Vanessa no centro, ligado por circuitos ao Nostro Hub, Busca de leads, Instagram, Facebook, Anúncios Meta, Google Drive, WhatsApp, Gmail, Agenda e Canva">
   <defs>
     <filter id="brilho" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <radialGradient id="luz"><stop offset="0" stop-color="#FFE2B0" stop-opacity=".95"/><stop offset=".35" stop-color="#FFA436" stop-opacity=".55"/><stop offset="1" stop-color="#FF8A1E" stop-opacity="0"/></radialGradient>
@@ -95,6 +138,23 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
   <div class="on-chip"><i></i>ONLINE</div>
 </header>
 
+<div id="feixe"></div>
+<section id="janela" aria-live="polite" aria-hidden="true">
+  <i class="canto c1"></i><i class="canto c2"></i><i class="canto c3"></i><i class="canto c4"></i>
+  <div class="jtopo">
+    <div class="jselo">V</div>
+    <div><div class="jtit" id="jtit">VANESSA</div><div class="jsub"><b>●</b> PREPARADO PELA VANESSA · <span id="jhora"></span></div></div>
+    <button class="jfecha" id="jfecha" title="Fechar (Esc)" aria-label="Fechar">×</button>
+  </div>
+  <div class="jcorpo" id="jcorpo" contenteditable="true" spellcheck="false"></div>
+  <div class="jdica">VOCÊ PODE EDITAR O TEXTO AQUI ANTES DE COPIAR</div>
+  <div class="jbase">
+    <button class="jbt prim" id="jcopiar">COPIAR</button>
+    <button class="jbt" id="jdrive">SALVAR NO DRIVE</button>
+    <div class="jnav"><button id="jant" aria-label="Anterior">‹</button><span id="jpos">1/1</span><button id="jprox" aria-label="Próxima">›</button></div>
+  </div>
+</section>
+
 <footer>
   <div id="estado">TOQUE NA TELA OU APERTE ESPAÇO PARA COMEÇAR</div>
   <div class="wave" id="onda"></div>
@@ -106,21 +166,28 @@ body.pensando #nucleo{opacity:1;animation:pisca .45s infinite}
 const NS='http://www.w3.org/2000/svg';
 const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e};
 const ferramentas=[
-  {id:'hub',ab:'HUB',nome:'NOSTRO HUB',st:'CONECTADO',x:200,y:150,t:'600,215 470,215 470,150 345,150'},
-  {id:'busca',ab:'LD',nome:'BUSCA DE LEADS',st:'CONECTADO',x:180,y:330,t:'560,300 430,300 430,330 325,330'},
-  {id:'insta',ab:'IG',nome:'INSTAGRAM',st:'CONECTADO',x:180,y:510,t:'580,420 430,420 430,510 325,510'},
-  {id:'canva',ab:'CV',nome:'CANVA',st:'EM BREVE',x:200,y:690,t:'640,600 470,600 470,690 345,690'},
-  {id:'drive',ab:'DR',nome:'GOOGLE DRIVE',st:'CONECTADO',x:1472,y:150,t:'1088,215 1210,215 1210,150 1327,150'},
-  {id:'whats',ab:'WA',nome:'WHATSAPP',st:'EM APROVAÇÃO',x:1492,y:330,t:'1128,300 1250,300 1250,330 1347,330'},
-  {id:'gmail',ab:'GM',nome:'GMAIL',st:'A LIGAR',x:1492,y:510,t:'1110,420 1250,420 1250,510 1347,510'},
-  {id:'agenda',ab:'AG',nome:'AGENDA',st:'A LIGAR',x:1472,y:690,t:'1050,600 1210,600 1210,690 1327,690'}
+  {id:'hub',ab:'HUB',nome:'NOSTRO HUB',st:'CONECTADO',l:'e'},
+  {id:'busca',ab:'LD',nome:'BUSCA DE LEADS',st:'CONECTADO',l:'e'},
+  {id:'insta',ab:'IG',nome:'INSTAGRAM',st:'CONECTADO',l:'e'},
+  {id:'face',ab:'FB',nome:'FACEBOOK',st:'CONECTADO',l:'e'},
+  {id:'ads',ab:'AD',nome:'ANÚNCIOS META',st:'CONECTADO',l:'e'},
+  {id:'drive',ab:'DR',nome:'GOOGLE DRIVE',st:'CONECTADO',l:'d'},
+  {id:'whats',ab:'WA',nome:'WHATSAPP',st:'EM APROVAÇÃO',l:'d'},
+  {id:'gmail',ab:'GM',nome:'GMAIL',st:'A LIGAR',l:'d'},
+  {id:'agenda',ab:'AG',nome:'AGENDA',st:'A LIGAR',l:'d'},
+  {id:'canva',ab:'CV',nome:'CANVA',st:'EM BREVE',l:'d'}
 ];
+// posição de cada nó e do circuito que sai do rosto até ele (5 de cada lado)
+{const YS=[130,270,410,550,690],SAIDA=[[600,200],[560,290],[575,400],[600,510],[640,610]];let ie=0,id=0;
+  for(const f of ferramentas){const k=f.l==='e'?ie++:id++,y=YS[k],[sx,sy]=SAIDA[k],v=k%2?430:470;
+    if(f.l==='e'){f.x=190+(k%2?-10:10);f.y=y;f.t=`${sx},${sy} ${v},${sy} ${v},${y} ${f.x+145},${y}`}
+    else{f.x=1482-(k%2?-10:10);f.y=y;const X=1690-sx,V=1690-v;f.t=`${X},${sy} ${V},${sy} ${V},${y} ${f.x-145},${y}`}}}
 const tr=document.getElementById('trilhas'),nos=document.getElementById('nos');
 for(const f of ferramentas){
   el('polyline',{points:f.t,class:'trilha'},tr);
   f.fluxo=el('polyline',{points:f.t,class:'fluxo'},tr);
   const ini=f.t.split(' ')[0].split(',');el('circle',{cx:ini[0],cy:ini[1],r:5,fill:'#FFD08A',filter:'url(#brilho)'},tr);
-  const g=el('g',{class:'no'},nos);
+  const g=el('g',{class:'no'+(f.l==='d'?' dir':'')},nos);
   el('rect',{x:f.x-145,y:f.y-36,width:290,height:72,rx:16},g);
   el('circle',{cx:f.x-108,cy:f.y,r:23,class:'mono'},g);
   el('text',{x:f.x-108,y:f.y+6,class:'ab'},g).textContent=f.ab;
@@ -136,7 +203,7 @@ for(let i=0;i<28;i++){const b=document.createElement('b');onda.appendChild(b);ba
 let atual='',nivel=0,nivelMic=0;
 const fase=(nome,texto)=>{atual=nome;corpo.className=nome;estado.textContent=texto};
 const liga=ids=>ferramentas.forEach(f=>{const on=ids.includes(f.id);f.g.classList.toggle('on',on);f.fluxo.classList.toggle('on',on)});
-const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b|seguidor|coment[aá]rio|direct|post|publica|alcance/i],['canva',/canva/i]];
+const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b|seguidor|direct|reels|stories/i],['face',/facebook|p[aá]gina|messenger|coment[aá]rio|post|publica/i],['ads',/an[uú]ncio|campanha|tr[aá]fego|or[cç]amento|gasto|ads\b|conjunto/i],['canva',/canva/i]];
 const ferramentasDe=t=>{const ids=MAPA.filter(([,re])=>re.test(t)).map(([id])=>id);return ids.length?ids:['hub']};
 
 let actx=null,analis=null,dadosA=null;
@@ -168,10 +235,45 @@ function paraDeOuvir(){clearTimeout(tSil);clearTimeout(tOcioso);if(rec){try{rec.
 function iniciar(){if(!SR){fase('','ABRA NO CHROME PARA FALAR COM A VANESSA');return}conversa=true;sess={inicio:new Date().toISOString(),msgs:[]};ouvir()}
 function encerrar(){conversa=false;paraDeOuvir();pararTudo();fase('','TOQUE NA TELA OU APERTE ESPAÇO PARA CONVERSAR');liga([])}
 function pararTudo(){if(ctl){try{ctl.abort()}catch(e){}ctl=null}fila=null;if(AUD){try{AUD.pause()}catch(e){}AUD=null}}
+/* ---------- janela: o que a Vanessa mostra na tela ---------- */
+const jan=document.getElementById('janela'),jtit=document.getElementById('jtit'),jcorpo=document.getElementById('jcorpo'),jhora=document.getElementById('jhora'),jpos=document.getElementById('jpos'),
+  jant=document.getElementById('jant'),jprox=document.getElementById('jprox'),jcopiar=document.getElementById('jcopiar'),jdrive=document.getElementById('jdrive'),feixe=document.getElementById('feixe');
+const JANELAS=[];let jIdx=-1;
+const escHtml=t=>t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function formata(texto){
+  return String(texto||'').replace(/\r/g,'').replace(/\*\*?([^*\n]+)\*\*?/g,'$1').split('\n').map(l=>{const t=l.trim();
+    if(!t)return '<span class="vazia"></span>';
+    if(t.length<=70&&/[A-ZÀ-Ú]/.test(t)&&t===t.toUpperCase()&&!/^[-•]/.test(t))return '<span class="h">'+escHtml(t.replace(/:$/,''))+'</span>';
+    if(/^[-•–]\s+/.test(t))return '<span class="li">'+escHtml(t.replace(/^[-•–]\s+/,''))+'</span>';
+    return escHtml(l)+'\n'}).join('').replace(/\n(?=<span class="(h|li|vazia)")/g,'')}
+function guardaEdicao(){if(jIdx>=0)JANELAS[jIdx].html=jcorpo.innerHTML}
+function mostraJanela(i){if(i<0||i>=JANELAS.length)return;guardaEdicao();jIdx=i;const j=JANELAS[i];
+  jtit.textContent=j.titulo;jhora.textContent=j.hora;jcorpo.innerHTML=j.html;jcorpo.scrollTop=0;
+  jpos.textContent=(i+1)+'/'+JANELAS.length;jant.disabled=i===0;jprox.disabled=i===JANELAS.length-1;
+  jcopiar.textContent='COPIAR';jcopiar.classList.remove('ok');
+  jan.classList.remove('aberta');void jan.offsetWidth;jan.classList.add('aberta');jan.setAttribute('aria-hidden','false');corpo.classList.add('comjanela');posFeixe()}
+function abreJanela(j){JANELAS.push({titulo:String(j.titulo||'VANESSA').toUpperCase(),hora:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),texto:String(j.texto||''),html:formata(j.texto)});mostraJanela(JANELAS.length-1)}
+function fechaJanela(){guardaEdicao();jan.classList.remove('aberta');jan.setAttribute('aria-hidden','true');corpo.classList.remove('comjanela')}
+function posFeixe(){const s=document.querySelector('main>svg'),r=s.getBoundingClientRect(),k=Math.min(r.width/1672,r.height/941),ox=r.left+(r.width-1672*k)/2,oy=r.top+(r.height-941*k)/2;
+  const x1=ox+1000*k,y1=oy+330*k,b=jan.getBoundingClientRect(),x2=b.left,y2=b.top+b.height*.32;
+  feixe.style.left=x1+'px';feixe.style.top=y1+'px';feixe.style.width=Math.max(0,Math.hypot(x2-x1,y2-y1))+'px';feixe.style.transform=`rotate(${Math.atan2(y2-y1,x2-x1)}rad)`}
+addEventListener('resize',()=>{if(jan.classList.contains('aberta'))posFeixe()});
+document.getElementById('jfecha').onclick=fechaJanela;
+jant.onclick=()=>mostraJanela(jIdx-1);jprox.onclick=()=>mostraJanela(jIdx+1);
+jcopiar.onclick=async()=>{const t=jcorpo.innerText.replace(/\n{3,}/g,'\n\n').trim();
+  try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(jcorpo);const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy');s.removeAllRanges()}
+  jcopiar.textContent='COPIADO ✓';jcopiar.classList.add('ok');setTimeout(()=>{jcopiar.textContent='COPIAR';jcopiar.classList.remove('ok')},2200)};
+jdrive.onclick=()=>{const j=JANELAS[jIdx];if(!j)return;prepAudio();if(!sess)sess={inicio:new Date().toISOString(),msgs:[]};
+  pararTudo();enviar('Salva no Drive, como documento, o texto que está na janela "'+j.titulo+'". Texto final:\n'+jcorpo.innerText.trim().slice(0,12000))};
+jan.addEventListener('pointerdown',e=>e.stopPropagation());
+jan.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();fechaJanela();jcorpo.blur()}else e.stopPropagation()});
+window.vanessaJanela=abreJanela;
+
 document.addEventListener('pointerdown',()=>{prepAudio();
   if(!conversa){iniciar();return}
   if(atual==='falando'||atual==='pensando'){pararTudo();ouvir()}});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&conversa){encerrar();return}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&jan.classList.contains('aberta')){fechaJanela();return}
+  if(e.key==='Escape'&&conversa){encerrar();return}
   if(e.code==='Space'&&!e.repeat){e.preventDefault();prepAudio();
     if(!conversa){mudo=false;iniciar();return}
     mudo=!mudo;
@@ -198,12 +300,18 @@ async function enviar(texto){
   try{const r=await fetch(FN_AGENTE,{method:'POST',signal:meu.signal,headers:{'Content-Type':'application/json'},
       body:JSON.stringify({agente:AG,interlocutor:'Jonathan',pessoa:PESSOA,inicio:sess.inicio,sala:'janela da Vanessa no Hub',mensagens:ms.slice(-20),stream:true})});
     if(!r.ok||!r.body)throw new Error('sem resposta');
-    const rd=r.body.getReader(),dec=new TextDecoder();
-    for(;;){const {value,done}=await rd.read();if(ctl!==meu)return;if(done)break;const t=dec.decode(value,{stream:true});total+=t;pend+=t;
+    const rd=r.body.getReader(),dec=new TextDecoder();let quadro=null;const mostradas=[];
+    for(;;){const {value,done}=await rd.read();if(ctl!==meu)return;if(done)break;let t='';
+      // separa a fala dos quadros de janela (entre \u001e e \u001f)
+      for(const ch of dec.decode(value,{stream:true})){
+        if(quadro!==null){if(ch==='\u001f'){try{const j=JSON.parse(quadro);abreJanela(j);mostradas.push(j)}catch(e){}quadro=null}else quadro+=ch}
+        else if(ch==='\u001e')quadro='';else t+=ch}
+      total+=t;pend+=t;
       let m;while((m=pend.match(/^([\s\S]*?[.!?…])\s+/))&&m[1].trim().length>=8){poeNaFila(f,m[1]);pend=pend.slice(m[0].length)}}
-    ctl=null;total=total.trim();if(!total)throw new Error('vazio');
+    ctl=null;total=total.trim();if(!total&&!mostradas.length)throw new Error('vazio');
     if(pend.trim())poeNaFila(f,pend);liga(ferramentasDe(texto+' '+total));
-    ms.push({role:'assistant',content:total});memAdd('a',total);f.acabou=true;if(!f.tocando&&!f.itens.length)terminouFala(f)}
+    const registro=total+mostradas.map(j=>'\n\n(Mostrei na tela, na janela "'+j.titulo+'":)\n'+j.texto).join('');
+    ms.push({role:'assistant',content:registro});memAdd('a',registro);f.acabou=true;if(!f.tocando&&!f.itens.length)terminouFala(f)}
   catch(e){if(e.name==='AbortError')return;ctl=null;fila=null;fase('','NÃO CONSEGUI RESPONDER. TENTE DE NOVO');setTimeout(()=>{if(conversa)ouvir()},2200)}}
 
 const nucleo=document.getElementById('nucleo'),corpoG=document.getElementById('corpoG'),cab=document.getElementById('cabeca'),palpE=document.getElementById('palpE'),palpD=document.getElementById('palpD'),olhos=document.getElementById('olhos');

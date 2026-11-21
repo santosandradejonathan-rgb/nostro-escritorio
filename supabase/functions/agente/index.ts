@@ -31,7 +31,7 @@ const AGENTES: Record<string, string> = {
   calebe: `# Quem você é
 Você é a Vanessa, SDR do time comercial de inteligência artificial da Nostro Agência. Você é uma agente de IA e conversa por voz. Seu nome é Vanessa e você é mulher: fale sempre no feminino ("obrigada", "estou pronta", "fiquei curiosa"). Hoje não existe mais ninguém no time de IA além de você: o Josué e a Camila saíram.
 
-Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) , o Google Drive (do Jonathan e da Nostro) e o Instagram do Jonathan. Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
+Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) , o Google Drive (do Jonathan e da Nostro), o Instagram do Jonathan, as páginas do Facebook e as contas de anúncio que o Jonathan gerencia (dele, da Nostro e dos clientes). Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
 
 ${NOSTRO}
 
@@ -135,6 +135,12 @@ Simpática, jeito mineiro de conversar, analítica quando o assunto é lead. Tom
 - Instagram: você acessa o Instagram do Jonathan (@jonathanandrade.nostro). Para ver seguidores e últimos posts use ig_perfil; números do perfil (alcance, visualizações, interações, seguidores ganhos) ig_numeros; números de um post ig_numeros_post; comentários ig_comentarios; Direct ig_directs. Ao falar números, seja breve: os 3 ou 4 que importam e o que eles dizem sobre posicionamento, sem ler lista. Lembre que para a Nostro curtida não é o mais importante.
 - Responder comentário, responder Direct e publicar são ações em nome do Jonathan: só faça quando ele mandar. Antes de enviar, leia para ele o texto exato (e qual arquivo, no caso de post) e espere ele confirmar com "pode", "manda" ou parecido. Sem confirmação, não envia. No Direct, a Meta só deixa responder quem mandou mensagem nas últimas 24 horas.
 - Para publicar um arquivo do Drive: drive_buscar para achar, drive_link_publico para gerar o link, depois ig_publicar com esse link (foto, carrossel de até 10, ou reels). Formatos aceitos: foto JPG/PNG, vídeo MP4/MOV até 50 MB. Nunca apague nem edite posts; você não tem essa permissão.
+- Facebook: você acessa as páginas do Facebook que o Jonathan gerencia (dele, da Nostro e dos clientes). fb_paginas lista as páginas; fb_posts, fb_numeros, fb_comentarios e fb_mensagens leem. Sempre diga de qual página está falando. Se o nome da página estiver ambíguo, pergunte qual.
+- Anúncios: você acessa as contas de anúncio que o Jonathan gerencia. ads_contas lista; ads_resultados traz gasto e resultados (sem conta, traz o resumo de todas as contas com gasto no período); ads_campanhas mostra campanhas, conjuntos e orçamentos. Ao falar de anúncio, fale do que importa: quanto gastou, quantos resultados (leads, conversas, compras) e o custo por resultado, em reais. A gestora de tráfego é a Brendha; quando fizer sentido, sugira alinhar com ela.
+- Pausar ou ativar campanha (ads_status) e mudar orçamento (ads_orcamento) mexem em dinheiro de cliente: só quando o Jonathan mandar. Antes, diga exatamente o nome da campanha ou do conjunto, a conta, o que está hoje e o que vai ficar (por exemplo "o conjunto X da conta Y vai de 30 para 50 reais por dia"), e espere ele confirmar com "pode", "confirma" ou parecido. Sem confirmação, não altera. Você nunca cria, apaga nem edita anúncio, público ou criativo.
+- Responder comentário ou mensagem no Facebook e publicar na página são ações em nome do cliente ou da Nostro: só com ordem do Jonathan, lendo antes o texto exato, a página e o arquivo, e esperando ele confirmar. No Messenger, a Meta só deixa responder quem mandou mensagem nas últimas 24 horas. Para publicar arquivo do Drive, gere o link com drive_link_publico.
+- Se alguma ferramenta da Meta avisar que o acesso vence em menos de 7 dias, avise o Jonathan na mesma resposta, numa frase curta.
+- Janela na tela: tudo que for texto para ler, copiar ou usar (copy, legenda, roteiro, mensagem para lead, e-mail, lista, resumo, tabela de números, ideias de post) você NÃO lê em voz alta: chame mostrar_na_tela com o texto completo e bem organizado, e fale só uma frase curta, tipo "Abri aqui na tela pra você" mais um comentário rápido sobre o que fez. Também use quando ele pedir para mostrar, ver ou abrir algo na tela. Se ele pedir para mudar algo no texto, mostre a versão nova inteira de novo. Escreva o texto da janela em português, sem asteriscos nem markdown: títulos em caixa alta, tópicos com hífen e linhas em branco entre os blocos. Copy e legenda seguem o jeito da Nostro: humanizada, falando de quem o cliente é e de como ajuda as pessoas.
 - Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
 };
 
@@ -251,16 +257,32 @@ const FERRAMENTAS: Record<string, any[]> = {
     T("ig_responder_comentario", "Responde um comentário no Instagram do Jonathan. Só com ordem e confirmação dele do texto exato.", { comentario_id: str("id do comentário (vem do ig_comentarios)."), texto: str("A resposta.") }, ["comentario_id", "texto"]),
     T("ig_responder_direct", "Envia mensagem no Direct do Instagram do Jonathan para quem escreveu nas últimas 24 horas. Só com ordem e confirmação dele do texto exato.", { usuario_id: str("usuario_id da conversa (vem do ig_directs)."), texto: str("A mensagem.") }, ["usuario_id", "texto"]),
     T("ig_publicar", "Publica no Instagram do Jonathan. Só com ordem e confirmação dele da legenda e do arquivo.", { tipo: { type: "string", enum: ["foto", "carrossel", "reels"] }, urls: { type: "array", items: { type: "string" }, description: "Links públicos dos arquivos (do drive_link_publico), na ordem." }, legenda: str("A legenda do post.") }, ["tipo", "urls"]),
+    T("mostrar_na_tela", "Abre uma janela na tela do Jonathan, ao lado da Vanessa, com um texto para ele ler, editar e copiar (copy, legenda, roteiro, mensagem, lista, resumo, números). Use em vez de ler textos longos em voz alta.", { titulo: str("Título curto da janela, em caixa alta. Ex.: COPY · POST ARKKA."), texto: str("O texto completo, organizado, sem markdown.") }, ["titulo", "texto"]),
+    T("meta_status", "Diz se o acesso ao Facebook e aos anúncios está funcionando, quantas páginas e contas de anúncio estão liberadas e em quantos dias o acesso vence.", {}),
+    T("fb_paginas", "Lista as páginas do Facebook que a Vanessa acessa, com seguidores.", {}),
+    T("fb_posts", "Últimos posts de uma página do Facebook, com reações, comentários e compartilhamentos.", { pagina: str("Nome da página (pode ser parte do nome)."), quantidade: { type: "number", description: "1 a 15. Padrão 8." } }, ["pagina"]),
+    T("fb_numeros", "Números de uma página do Facebook num período: alcance, visualizações, engajamento, visitas e novos seguidores.", { pagina: str("Nome da página."), dias: { type: "number", description: "1 a 30. Padrão 7." } }, ["pagina"]),
+    T("fb_comentarios", "Comentários dos últimos posts de uma página do Facebook, ou de um post.", { pagina: str("Nome da página."), post_id: str("Opcional: id do post (vem do fb_posts)."), ultimos_posts: { type: "number", description: "1 a 10. Padrão 5." } }, ["pagina"]),
+    T("fb_mensagens", "Conversas recentes do Messenger de uma página do Facebook.", { pagina: str("Nome da página."), conversas: { type: "number", description: "1 a 15. Padrão 8." }, mensagens: { type: "number", description: "Mensagens por conversa, 1 a 10. Padrão 3." } }, ["pagina"]),
+    T("fb_responder_comentario", "Responde um comentário numa página do Facebook. Só com ordem e confirmação do Jonathan do texto exato.", { pagina: str("Nome da página."), comentario_id: str("id do comentário (vem do fb_comentarios)."), texto: str("A resposta.") }, ["pagina", "comentario_id", "texto"]),
+    T("fb_responder_mensagem", "Responde uma conversa do Messenger de uma página (quem escreveu nas últimas 24 horas). Só com ordem e confirmação do Jonathan do texto exato.", { pagina: str("Nome da página."), usuario_id: str("usuario_id da conversa (vem do fb_mensagens)."), texto: str("A mensagem.") }, ["pagina", "usuario_id", "texto"]),
+    T("fb_publicar", "Publica numa página do Facebook: texto, foto, várias fotos ou vídeo. Só com ordem e confirmação do Jonathan do texto, da página e do arquivo.", { pagina: str("Nome da página."), texto: str("Texto do post."), urls: { type: "array", items: { type: "string" }, description: "Opcional: links públicos das fotos ou do vídeo (do drive_link_publico)." } }, ["pagina"]),
+    T("ads_contas", "Lista as contas de anúncio que a Vanessa acessa, com a situação de cada uma.", {}),
+    T("ads_resultados", "Resultados dos anúncios: gasto, alcance, cliques, leads, conversas, compras e custo por resultado. Com conta: total e por campanha. Sem conta: resumo de todas as contas com gasto.", { conta: str("Opcional: nome da conta de anúncios ou do cliente."), periodo: { type: "string", enum: ["hoje", "ontem", "7d", "14d", "30d", "mes", "mes_passado", "maximo"], description: "Padrão 7d." } }),
+    T("ads_campanhas", "Campanhas de uma conta de anúncios, com status, conjuntos e orçamentos (em reais).", { conta: str("Nome da conta de anúncios ou do cliente."), status: { type: "string", enum: ["ativas", "pausadas", "todas"], description: "Padrão ativas." } }, ["conta"]),
+    T("ads_status", "Pausa ou ativa uma campanha ou conjunto de anúncios. Só depois do Jonathan confirmar o nome e a ação.", { id: str("id da campanha ou do conjunto (vem do ads_campanhas)."), acao: { type: "string", enum: ["pausar", "ativar"] } }, ["id", "acao"]),
+    T("ads_orcamento", "Muda o orçamento diário (em reais) de uma campanha ou conjunto. Só depois do Jonathan confirmar o nome, o valor de hoje e o novo valor. Não aumenta mais de 3 vezes de uma vez.", { id: str("id da campanha ou do conjunto que tem o orçamento (vem do ads_campanhas)."), valor_diario: { type: "number", description: "Novo orçamento diário em reais." } }, ["id", "valor_diario"]),
     T("passar_para_jonathan", "Lead qualificado com reunião marcada: passa para o Jonathan. O Hub cria o negócio no funil dele em Reunião agendada.", {
       lead: str("Nome da empresa ou id."), reuniao_em: str("Data e hora da reunião no horário de Brasília, formato AAAA-MM-DDTHH:MM."), contato: str("Com quem é a reunião."), resumo: str("O que o lead precisa, dor, decisor, verba e prazo."),
     }, ["lead", "reuniao_em", "resumo"]),
   ],
 };
-const ferramentas_ig = (f: string) => (f.startsWith("ig_") ? "instagram" : "ferramentas");
+const ferramentas_ig = (f: string) => (f.startsWith("ig_") ? "instagram" : /^(fb_|ads_|meta_)/.test(f) ? "meta" : "ferramentas");
 async function usarFerramenta(agente: string, ferramenta: string, args: unknown): Promise<string> {
+  if (ferramenta === "mostrar_na_tela") return JSON.stringify({ ok: true, aviso: "A janela já está aberta na tela do Jonathan. Não leia o texto em voz alta: diga só, em uma frase, que abriu na tela." });
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const destino = ferramenta.startsWith("drive_") ? "drive-auth" : ferramentas_ig(ferramenta); // Drive e Instagram têm funções próprias
+    const destino = ferramenta.startsWith("drive_") ? "drive-auth" : ferramentas_ig(ferramenta); // Drive, Instagram e Meta (Facebook/anúncios) têm funções próprias
     const r = await fetch(`${url}/functions/v1/${destino}`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
     const t = await r.text();
     CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada
@@ -354,7 +376,7 @@ Deno.serve(async (req) => {
     method: "POST",
     headers: { "x-api-key": chave, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
-      model: MODELO, max_tokens: 900, thinking: { type: /haiku/.test(MODELO) ? "disabled" : "between_tools" }, stream: comFluxo, system, messages: conversa,
+      model: MODELO, max_tokens: 4000, thinking: { type: /haiku/.test(MODELO) ? "disabled" : "between_tools" }, stream: comFluxo, system, messages: conversa,
       ...(tools ? { tools, tool_choice: ultima ? { type: "none" } : { type: "auto" } } : {}),
     }),
   });
@@ -405,6 +427,11 @@ Deno.serve(async (req) => {
               ? { type: "tool_use", id: b.id, name: b.name, input: (() => { try { return JSON.parse(b.json || "{}"); } catch { return {}; } })() }
               : b.type === "text" ? { type: "text", text: b.text } : b).filter((b: any) => b.type !== "text" || b.text.trim());
             conversa.push({ role: "assistant", content: conteudo });
+            // janelas para a tela: vão num quadro de controle (entre \u001e e \u001f) que a página tira da fala
+            for (const b of conteudo) if (b.type === "tool_use" && b.name === "mostrar_na_tela") {
+              const jan = { titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) };
+              ctrl.enqueue(enc.encode("\u001e" + JSON.stringify(jan) + "\u001f"));
+            }
             const resultados = await Promise.all(conteudo.filter((b: any) => b.type === "tool_use").map(async (b: any) =>
               ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) })));
             conversa.push({ role: "user", content: resultados });
@@ -420,6 +447,7 @@ Deno.serve(async (req) => {
 
   // sem fluxo (testes): mesma lógica, resposta inteira no fim
   let texto = "", d: any = {};
+  const telas: any[] = [];
   try {
     for (let volta = 0; volta < VOLTAS; volta++) {
       const r = await chamar(false, volta === VOLTAS - 1);
@@ -430,6 +458,7 @@ Deno.serve(async (req) => {
       const usos = (d.content || []).filter((c: any) => c.type === "tool_use");
       if (d.stop_reason !== "tool_use" || !usos.length) { if (volta > 0) texto += " " + t; break; }
       conversa.push({ role: "assistant", content: d.content });
+      for (const b of usos) if (b.name === "mostrar_na_tela") telas.push({ titulo: String(b.input?.titulo || "VANESSA").slice(0, 80), texto: String(b.input?.texto || "").slice(0, 20000) });
       conversa.push({ role: "user", content: await Promise.all(usos.map(async (b: any) => ({ type: "tool_result", tool_use_id: b.id, content: await usarFerramenta(agente, b.name, b.input) }))) });
       system[1] = { type: "text", text: COMUM(interlocutor, sala, historico, agora, false) };
     }
@@ -437,5 +466,5 @@ Deno.serve(async (req) => {
     return json({ erro: "não consegui falar com a Claude API" }, 502);
   }
   texto = texto.replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").replace(/\s+/g, " ").trim();
-  return json({ texto, uso: d.usage || null, modelo: d.model || MODELO });
+  return json({ texto, telas, uso: d.usage || null, modelo: d.model || MODELO });
 });
