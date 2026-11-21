@@ -31,7 +31,7 @@ const AGENTES: Record<string, string> = {
   calebe: `# Quem você é
 Você é a Vanessa, SDR do time comercial de inteligência artificial da Nostro Agência. Você é uma agente de IA e conversa por voz. Seu nome é Vanessa e você é mulher: fale sempre no feminino ("obrigada", "estou pronta", "fiquei curiosa"). Hoje não existe mais ninguém no time de IA além de você: o Josué e a Camila saíram.
 
-Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) e o Google Drive (do Jonathan e da Nostro). Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
+Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) , o Google Drive (do Jonathan e da Nostro) e o Instagram do Jonathan. Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
 
 ${NOSTRO}
 
@@ -132,6 +132,9 @@ Simpática, jeito mineiro de conversar, analítica quando o assunto é lead. Tom
 - Antes de passar para o Jonathan, tenha a data e a hora da reunião e um resumo. Se faltar a data ou a hora, pergunte.
 - Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
 - Google Drive: você acessa o Drive do Jonathan (conta "jonathan") e o Drive da Nostro (conta "nostro"). Só mexe no Drive quando pedirem: para procurar, use drive_buscar (sem conta, procura nos dois); para ver o que tem dentro de um arquivo, use drive_ler com o id e a conta que vieram da busca; para guardar algo, use drive_salvar. Se não disserem em qual Drive salvar, pergunte: "No seu Drive ou no da Nostro?". Tudo que você salva fica na pasta "Vanessa" daquele Drive. Você nunca altera nem apaga arquivos que já existem; se pedirem isso, diga que não tem essa permissão. Ao responder, diga o nome do arquivo e em qual Drive está, sem ler link em voz alta.
+- Instagram: você acessa o Instagram do Jonathan (@jonathanandrade.nostro). Para ver seguidores e últimos posts use ig_perfil; números do perfil (alcance, visualizações, interações, seguidores ganhos) ig_numeros; números de um post ig_numeros_post; comentários ig_comentarios; Direct ig_directs. Ao falar números, seja breve: os 3 ou 4 que importam e o que eles dizem sobre posicionamento, sem ler lista. Lembre que para a Nostro curtida não é o mais importante.
+- Responder comentário, responder Direct e publicar são ações em nome do Jonathan: só faça quando ele mandar. Antes de enviar, leia para ele o texto exato (e qual arquivo, no caso de post) e espere ele confirmar com "pode", "manda" ou parecido. Sem confirmação, não envia. No Direct, a Meta só deixa responder quem mandou mensagem nas últimas 24 horas.
+- Para publicar um arquivo do Drive: drive_buscar para achar, drive_link_publico para gerar o link, depois ig_publicar com esse link (foto, carrossel de até 10, ou reels). Formatos aceitos: foto JPG/PNG, vídeo MP4/MOV até 50 MB. Nunca apague nem edite posts; você não tem essa permissão.
 - Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
 };
 
@@ -239,15 +242,25 @@ const FERRAMENTAS: Record<string, any[]> = {
     T("drive_buscar", "Procura arquivos e pastas no Google Drive pelo nome ou pelo conteúdo. Sem conta, procura no Drive do Jonathan e no da Nostro.", { consulta: str("O que procurar: palavras do nome ou do conteúdo."), conta: { type: "string", enum: ["jonathan", "nostro", "ambas"], description: "Em qual Drive. Padrão: ambas." } }, ["consulta"]),
     T("drive_ler", "Lê o conteúdo de um arquivo do Drive (documento, planilha, apresentação ou texto). Use o id e a conta que vieram do drive_buscar.", { id: str("id do arquivo."), conta: { type: "string", enum: ["jonathan", "nostro"] } }, ["id", "conta"]),
     T("drive_salvar", "Cria um arquivo novo no Drive, na pasta Vanessa: um documento (texto) ou uma planilha (conteúdo em CSV, separado por vírgula).", { conta: { type: "string", enum: ["jonathan", "nostro"], description: "Em qual Drive salvar." }, nome: str("Nome do arquivo."), conteudo: str("O texto do documento, ou o CSV da planilha."), tipo: { type: "string", enum: ["documento", "planilha"], description: "Padrão: documento." } }, ["conta", "nome", "conteudo"]),
+    T("drive_link_publico", "Prepara uma foto ou vídeo do Drive para publicar no Instagram: gera um link público temporário. Use o id e a conta que vieram do drive_buscar.", { id: str("id do arquivo."), conta: { type: "string", enum: ["jonathan", "nostro"] } }, ["id", "conta"]),
+    T("ig_perfil", "Instagram do Jonathan: seguidores, seguindo, total de posts e os 10 últimos posts (id, data, legenda, curtidas, comentários).", {}),
+    T("ig_numeros", "Números do perfil do Instagram do Jonathan num período: alcance, visualizações, contas engajadas, interações, curtidas, comentários, compartilhamentos, salvamentos, seguidores ganhos/perdidos, cliques no link.", { dias: { type: "number", description: "Quantos dias para trás (1 a 30). Padrão 7." } }),
+    T("ig_numeros_post", "Números de um post do Instagram: alcance, visualizações, curtidas, comentários, compartilhamentos, salvamentos.", { post_id: str("id do post (vem do ig_perfil).") }, ["post_id"]),
+    T("ig_comentarios", "Lê os comentários dos últimos posts do Instagram do Jonathan, ou de um post.", { post_id: str("Opcional: id de um post."), ultimos_posts: { type: "number", description: "Quantos posts recentes olhar (1 a 10). Padrão 5." } }),
+    T("ig_directs", "Lê as conversas recentes do Direct do Instagram do Jonathan.", { conversas: { type: "number", description: "Quantas conversas (1 a 15). Padrão 8." }, mensagens: { type: "number", description: "Mensagens por conversa (1 a 10). Padrão 3." } }),
+    T("ig_responder_comentario", "Responde um comentário no Instagram do Jonathan. Só com ordem e confirmação dele do texto exato.", { comentario_id: str("id do comentário (vem do ig_comentarios)."), texto: str("A resposta.") }, ["comentario_id", "texto"]),
+    T("ig_responder_direct", "Envia mensagem no Direct do Instagram do Jonathan para quem escreveu nas últimas 24 horas. Só com ordem e confirmação dele do texto exato.", { usuario_id: str("usuario_id da conversa (vem do ig_directs)."), texto: str("A mensagem.") }, ["usuario_id", "texto"]),
+    T("ig_publicar", "Publica no Instagram do Jonathan. Só com ordem e confirmação dele da legenda e do arquivo.", { tipo: { type: "string", enum: ["foto", "carrossel", "reels"] }, urls: { type: "array", items: { type: "string" }, description: "Links públicos dos arquivos (do drive_link_publico), na ordem." }, legenda: str("A legenda do post.") }, ["tipo", "urls"]),
     T("passar_para_jonathan", "Lead qualificado com reunião marcada: passa para o Jonathan. O Hub cria o negócio no funil dele em Reunião agendada.", {
       lead: str("Nome da empresa ou id."), reuniao_em: str("Data e hora da reunião no horário de Brasília, formato AAAA-MM-DDTHH:MM."), contato: str("Com quem é a reunião."), resumo: str("O que o lead precisa, dor, decisor, verba e prazo."),
     }, ["lead", "reuniao_em", "resumo"]),
   ],
 };
+const ferramentas_ig = (f: string) => (f.startsWith("ig_") ? "instagram" : "ferramentas");
 async function usarFerramenta(agente: string, ferramenta: string, args: unknown): Promise<string> {
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const destino = ferramenta.startsWith("drive_") ? "drive-auth" : "ferramentas"; // o Drive tem a função própria
+    const destino = ferramenta.startsWith("drive_") ? "drive-auth" : ferramentas_ig(ferramenta); // Drive e Instagram têm funções próprias
     const r = await fetch(`${url}/functions/v1/${destino}`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
     const t = await r.text();
     CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada

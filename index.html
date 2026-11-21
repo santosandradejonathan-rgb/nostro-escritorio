@@ -108,7 +108,7 @@ const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.set
 const ferramentas=[
   {id:'hub',ab:'HUB',nome:'NOSTRO HUB',st:'CONECTADO',x:200,y:150,t:'600,215 470,215 470,150 345,150'},
   {id:'busca',ab:'LD',nome:'BUSCA DE LEADS',st:'CONECTADO',x:180,y:330,t:'560,300 430,300 430,330 325,330'},
-  {id:'insta',ab:'IG',nome:'INSTAGRAM',st:'EM BREVE',x:180,y:510,t:'580,420 430,420 430,510 325,510'},
+  {id:'insta',ab:'IG',nome:'INSTAGRAM',st:'CONECTADO',x:180,y:510,t:'580,420 430,420 430,510 325,510'},
   {id:'canva',ab:'CV',nome:'CANVA',st:'EM BREVE',x:200,y:690,t:'640,600 470,600 470,690 345,690'},
   {id:'drive',ab:'DR',nome:'GOOGLE DRIVE',st:'CONECTADO',x:1472,y:150,t:'1088,215 1210,215 1210,150 1327,150'},
   {id:'whats',ab:'WA',nome:'WHATSAPP',st:'EM APROVAÇÃO',x:1492,y:330,t:'1128,300 1250,300 1250,330 1347,330'},
@@ -136,7 +136,7 @@ for(let i=0;i<28;i++){const b=document.createElement('b');onda.appendChild(b);ba
 let atual='',nivel=0,nivelMic=0;
 const fase=(nome,texto)=>{atual=nome;corpo.className=nome;estado.textContent=texto};
 const liga=ids=>ferramentas.forEach(f=>{const on=ids.includes(f.id);f.g.classList.toggle('on',on);f.fluxo.classList.toggle('on',on)});
-const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b/i],['canva',/canva/i]];
+const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b|seguidor|coment[aá]rio|direct|post|publica|alcance/i],['canva',/canva/i]];
 const ferramentasDe=t=>{const ids=MAPA.filter(([,re])=>re.test(t)).map(([id])=>id);return ids.length?ids:['hub']};
 
 let actx=null,analis=null,dadosA=null;

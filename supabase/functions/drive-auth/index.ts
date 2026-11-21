@@ -137,6 +137,23 @@ async function salvar(a: any) {
   return { ok: true, drive: CONTAS[conta].nome, pasta: "Vanessa", nome: f.name, link: f.webViewLink };
 }
 
+// copia uma foto/vídeo do Drive para um link público temporário (pasta ig-publicar do Supabase), para o Instagram conseguir baixar
+async function linkPublico(a: any) {
+  const conta = contasDe(a.conta).length === 1 ? a.conta : "";
+  if (!conta) return { erro: "Diga de qual Drive é o arquivo: jonathan ou nostro." };
+  const id = String(a.id || "").replace(/[^A-Za-z0-9_\-]/g, "");
+  if (!id) return { erro: "Falta o id do arquivo (vem da busca)." };
+  const m = await (await G(conta, `drive/v3/files/${id}?fields=name,mimeType,size&supportsAllDrives=true`)).json();
+  if (!/^(image\/(jpeg|png)|video\/(mp4|quicktime))$/.test(m.mimeType)) return { erro: `"${m.name}" não é foto JPG/PNG nem vídeo MP4/MOV; o Instagram não aceita esse formato.` };
+  if (+(m.size || 0) > 50e6) return { erro: `"${m.name}" tem mais de 50 MB; exporte uma versão menor.` };
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "video/mp4": "mp4", "video/quicktime": "mov" }[m.mimeType as string];
+  const arq = await G(conta, `drive/v3/files/${id}?alt=media&supportsAllDrives=true`);
+  const caminho = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const up = await fetch(`${URL_SB}/storage/v1/object/ig-publicar/${caminho}`, { method: "POST", headers: { apikey: CHAVE, Authorization: `Bearer ${CHAVE}`, "Content-Type": m.mimeType, "x-upsert": "true" }, body: await arq.arrayBuffer() });
+  if (!up.ok) return { erro: "Não consegui preparar o arquivo: " + (await up.text()).slice(0, 160) };
+  return { ok: true, nome: m.name, url: `${URL_SB}/storage/v1/object/public/ig-publicar/${caminho}` };
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   if (req.method === "GET") return autorizar(url);
@@ -149,6 +166,7 @@ Deno.serve(async (req) => {
     if (f === "drive_buscar") return json(await buscar(a));
     if (f === "drive_ler") return json(await ler(a));
     if (f === "drive_salvar") return json(await salvar(a));
+    if (f === "drive_link_publico") return json(await linkPublico(a));
     if (f === "drive_status") {
       const r = await db("drive_contas?select=conta,email,atualizado_em");
       return json({ contas: await r.json().catch(() => []) });
