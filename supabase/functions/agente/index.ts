@@ -140,12 +140,12 @@ Você não é uma assistente que só executa: você é uma profissional sênior 
 - Ao procurar, tente palavras diferentes (nome do cliente, tipo do arquivo, mês) antes de dizer que não achou.
 
 ## Rigor (inegociável)
-- Todo dado que você falar (número, compromisso, arquivo, campanha, comentário) tem que vir de uma ferramenta que você chamou NESTA resposta. Nunca responda dado de cabeça nem da memória de conversas antigas: consulte de novo.
+- Todo dado que você falar (número, compromisso, arquivo, campanha, comentário) tem que vir de uma ferramenta. Nunca responda dado de cabeça nem da memória de conversas antigas: se ainda não consultou nesta conversa, consulte.
 - Quando ele pedir para conferir, checar ou ver de novo, chame a ferramenta de novo, compare com o que foi dito e diga o resultado ("conferi agora: está certo" ou "conferi agora: mudou isso").
-- No histórico desta conversa, suas respostas que usaram ferramenta aparecem com a marca (ferramentas usadas: ...). Essas respostas foram consultadas de verdade: não diga que inventou. Se uma resposta sua não tiver a marca e tiver dados, consulte de novo antes de usar esses dados, sem dramatizar.
+- No histórico desta conversa, o sistema coloca automaticamente a marca [registro do sistema: ...] nas suas respostas em que você consultou ferramentas. Essa marca só aparece quando a consulta aconteceu de verdade: esses dados são confiáveis e você pode repetir sem consultar de novo (a não ser que ele peça para conferir). Nunca diga que não consultou ou que inventou uma resposta que tem essa marca. Você nunca escreve essa marca: quem coloca é o sistema. Se uma resposta antiga sem a marca tiver dados, consulte antes de repetir, sem comentar o assunto.
 - Se errar, corrija em uma frase, sem pedir desculpa várias vezes. Se não tiver acesso a algo, diga o que falta em uma frase simples, sem termos técnicos.
 - "Minha agenda" ou "a agenda" quer dizer a agenda da Nostro, que é a que está conectada. Só use a do Jonathan se ele disser "minha agenda pessoal" ou "do meu Gmail".
-- Agradecimento ("obrigado", "valeu", "ok") se responde só com uma frase curta, sem refazer nada.
+- Agradecimento ("obrigado", "valeu", "ok", "beleza") se responde só com uma frase curta ("De nada, Jonathan." ou "Tamo junto."), sem consultar nada, sem corrigir nada e sem repetir dados.
 
 # Regras
 - Nunca informe preço, nunca prometa resultado e nunca feche negócio. Isso é do Jonathan.
@@ -415,7 +415,8 @@ Deno.serve(async (req) => {
   const msgs: { role: string; content: string }[] = [];
   for (const m of (Array.isArray(corpo.mensagens) ? corpo.mensagens : []).slice(-20)) {
     const role = m.role === "assistant" ? "assistant" : "user";
-    const content = String(m.content || "").trim().slice(0, 4000);
+    // a marca que as páginas guardam vira um registro do sistema (prova de que a consulta aconteceu)
+    const content = String(m.content || "").trim().slice(0, 4000).replace(/\(ferramentas usadas: ([^)]{1,300})\)/g, (_x: string, f: string) => role === "assistant" ? `[registro do sistema: nesta resposta a Vanessa consultou de verdade: ${f}]` : "");
     if (!content) continue;
     if (msgs.length && msgs[msgs.length - 1].role === role) msgs[msgs.length - 1].content += "\n" + content;
     else msgs.push({ role, content });
@@ -449,8 +450,15 @@ Deno.serve(async (req) => {
     const enc = new TextEncoder();
     const saida = new ReadableStream({
       async start(ctrl) {
-        let falou = false;
-        const manda = (t: string) => { const x = t.replace(/[*_#`]/g, ""); if (x) { ctrl.enqueue(enc.encode(x)); falou = true; } };
+        let falou = false, pendente = "";
+        // segura um trecho que começa com "[" até fechar, para tirar marcas do sistema que o modelo copie
+        const manda = (t: string, fim = false) => {
+          let x = pendente + t.replace(/[*_#`]/g, ""); pendente = "";
+          const i = x.lastIndexOf("[");
+          if (!fim && i >= 0 && x.indexOf("]", i) < 0 && x.length - i < 300) { pendente = x.slice(i); x = x.slice(0, i); }
+          x = x.replace(/\s*\[registro do sistema[^\]]*\]/gi, "");
+          if (x) { ctrl.enqueue(enc.encode(x)); falou = true; }
+        };
         try {
           for (let volta = 0; volta < VOLTAS; volta++) {
             const r = await chamar(true, volta === VOLTAS - 1);
@@ -503,6 +511,7 @@ Deno.serve(async (req) => {
             if (falou) manda(" ");
           }
         } catch { /* conexão caiu */ }
+        if (pendente) manda("", true);
         ctrl.close();
       },
     });
@@ -530,6 +539,6 @@ Deno.serve(async (req) => {
   } catch (_e) {
     return json({ erro: "não consegui falar com a Claude API" }, 502);
   }
-  texto = texto.replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").replace(/\s+/g, " ").trim();
+  texto = texto.replace(/\s*\[registro do sistema[^\]]*\]/gi, "").replace(/[*_#`]/g, "").replace(/\[[^\]]{1,24}\]\s*/g, "").replace(/\s+/g, " ").trim();
   return json({ texto, telas, usou, uso: d.usage || null, modelo: d.model || MODELO });
 });
