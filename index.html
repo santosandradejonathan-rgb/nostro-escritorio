@@ -172,6 +172,7 @@ const ferramentas=[
   {id:'insta',ab:'IG',nome:'INSTAGRAM',st:'CONECTADO',l:'e'},
   {id:'face',ab:'FB',nome:'FACEBOOK',st:'CONECTADO',l:'e'},
   {id:'ads',ab:'AD',nome:'ANÚNCIOS META',st:'CONECTADO',l:'e'},
+  {id:'linkedin',ab:'IN',nome:'LINKEDIN',st:'CONECTADO',l:'e'},
   {id:'drive',ab:'DR',nome:'GOOGLE DRIVE',st:'CONECTADO',l:'d'},
   {id:'whats',ab:'WA',nome:'WHATSAPP',st:'EM APROVAÇÃO',l:'d'},
   {id:'gmail',ab:'GM',nome:'GMAIL',st:'A LIGAR',l:'d'},
@@ -179,8 +180,12 @@ const ferramentas=[
   {id:'canva',ab:'CV',nome:'CANVA',st:'EM BREVE',l:'d'}
 ];
 // posição de cada nó e do circuito que sai do rosto até ele (5 de cada lado)
-{const YS=[130,270,410,550,690],SAIDA=[[600,200],[560,290],[575,400],[600,510],[640,610]];let ie=0,id=0;
-  for(const f of ferramentas){const k=f.l==='e'?ie++:id++,y=YS[k],[sx,sy]=SAIDA[k],v=k%2?430:470;
+{const SAIDA=[[600,200],[560,290],[575,400],[600,510],[640,610]];let ie=0,id=0;
+  const qt={e:ferramentas.filter(f=>f.l==='e').length,d:ferramentas.filter(f=>f.l==='d').length};
+  // espalha os nós de cada lado entre 120 e 720 e a saída do circuito ao longo do rosto
+  const pos=(k,n)=>{const fr=n>1?k/(n-1):0,y=Math.round(120+fr*600),i=fr*(SAIDA.length-1),a=Math.floor(i),b=Math.min(a+1,SAIDA.length-1),t=i-a;
+    return [y,Math.round(SAIDA[a][0]+(SAIDA[b][0]-SAIDA[a][0])*t),Math.round(SAIDA[a][1]+(SAIDA[b][1]-SAIDA[a][1])*t)]};
+  for(const f of ferramentas){const k=f.l==='e'?ie++:id++,[y,sx,sy]=pos(k,qt[f.l]),v=k%2?430:470;
     if(f.l==='e'){f.x=190+(k%2?-10:10);f.y=y;f.t=`${sx},${sy} ${v},${sy} ${v},${y} ${f.x+145},${y}`}
     else{f.x=1482-(k%2?-10:10);f.y=y;const X=1690-sx,V=1690-v;f.t=`${X},${sy} ${V},${sy} ${V},${y} ${f.x-145},${y}`}}}
 const tr=document.getElementById('trilhas'),nos=document.getElementById('nos');
@@ -204,7 +209,7 @@ for(let i=0;i<28;i++){const b=document.createElement('b');onda.appendChild(b);ba
 let atual='',nivel=0,nivelMic=0;
 const fase=(nome,texto)=>{atual=nome;corpo.className=nome;estado.textContent=texto};
 const liga=ids=>ferramentas.forEach(f=>{const on=ids.includes(f.id);f.g.classList.toggle('on',on);f.fluxo.classList.toggle('on',on)});
-const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b|seguidor|direct|reels|stories/i],['face',/facebook|p[aá]gina|messenger|coment[aá]rio|post|publica/i],['ads',/an[uú]ncio|campanha|tr[aá]fego|or[cç]amento|gasto|ads\b|conjunto/i],['canva',/canva/i]];
+const MAPA=[['hub',/funil|hub|lead|card|neg[oó]cio|cliente|etapa/i],['busca',/busc|procur|lista|empresa|gera[cç][aã]o|triagem|analis|prospec/i],['whats',/whats|zap|mensagem/i],['drive',/drive|arquivo|pasta/i],['gmail',/e-?mail|gmail/i],['agenda',/agenda|reuni[aã]o|marc|hor[aá]rio/i],['insta',/instagram|insta\b|seguidor|direct|reels|stories/i],['face',/facebook|p[aá]gina|messenger|coment[aá]rio|post|publica/i],['linkedin',/linked ?in|linkedin/i],['ads',/an[uú]ncio|campanha|tr[aá]fego|or[cç]amento|gasto|ads\b|conjunto/i],['canva',/canva/i]];
 const ferramentasDe=t=>{const ids=MAPA.filter(([,re])=>re.test(t)).map(([id])=>id);return ids.length?ids:['hub']};
 
 let actx=null,analis=null,dadosA=null;
