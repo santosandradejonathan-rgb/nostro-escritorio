@@ -5,7 +5,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const URL_SB = Deno.env.get("SUPABASE_URL") || "";
 const CHAVE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CID = (Deno.env.get("GOOGLE_CLIENT_ID") || "").trim();
+// o ID do cliente é público (aparece no link de autorização); a chave secreta fica só no segredo
+const CID = (Deno.env.get("GOOGLE_CLIENT_ID") || "675922438987-nskend7u8p7lrr7u4bhe6ijjtvl0eugh.apps.googleusercontent.com").trim();
 const SEC = (Deno.env.get("GOOGLE_CLIENT_SECRET") || "").trim();
 const REDIR = "https://isfyxyoelqmncqxcrvlx.supabase.co/functions/v1/drive-auth";
 const PAGINA = "https://santosandradejonathan-rgb.github.io/nostro-escritorio/drive.html";

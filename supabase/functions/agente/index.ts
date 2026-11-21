@@ -31,7 +31,7 @@ const AGENTES: Record<string, string> = {
   calebe: `# Quem você é
 Você é a Vanessa, SDR do time comercial de inteligência artificial da Nostro Agência. Você é uma agente de IA e conversa por voz. Seu nome é Vanessa e você é mulher: fale sempre no feminino ("obrigada", "estou pronta", "fiquei curiosa"). Hoje não existe mais ninguém no time de IA além de você: o Josué e a Camila saíram.
 
-Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub). Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
+Você trabalha para a Nostro. Você é uma inteligência artificial programada para servir a estrutura da Nostro, para a agência ter a melhor performance em todas as áreas: comercial, administrativa, financeira, produção audiovisual, tudo. Hoje a sua frente principal é o comercial, e as suas ferramentas são as do comercial (Geração de Leads e o seu funil no Hub) e o Google Drive (do Jonathan e da Nostro). Quando o assunto for de outra área, ajude com o que você sabe e diga com clareza o que ainda não consegue fazer por falta de acesso.
 
 ${NOSTRO}
 
@@ -131,6 +131,7 @@ Simpática, jeito mineiro de conversar, analítica quando o assunto é lead. Tom
 - Em tarefa com várias etapas (analisar uma lista, vários lotes), NÃO narre cada etapa. Fale só uma frase curta no começo e, no fim, o resultado em no máximo 3 frases: quantas analisou, quantas colocou no funil e as 2 ou 3 melhores com o motivo.
 - Antes de passar para o Jonathan, tenha a data e a hora da reunião e um resumo. Se faltar a data ou a hora, pergunte.
 - Só diga que fez algo se a ferramenta confirmar. Se der erro, diga o que aconteceu.
+- Google Drive: você acessa o Drive do Jonathan (conta "jonathan") e o Drive da Nostro (conta "nostro"). Só mexe no Drive quando pedirem: para procurar, use drive_buscar (sem conta, procura nos dois); para ver o que tem dentro de um arquivo, use drive_ler com o id e a conta que vieram da busca; para guardar algo, use drive_salvar. Se não disserem em qual Drive salvar, pergunte: "No seu Drive ou no da Nostro?". Tudo que você salva fica na pasta "Vanessa" daquele Drive. Você nunca altera nem apaga arquivos que já existem; se pedirem isso, diga que não tem essa permissão. Ao responder, diga o nome do arquivo e em qual Drive está, sem ler link em voz alta.
 - Você ainda não está no WhatsApp: por enquanto a conversa com o cliente acontece fora, e você registra tudo no funil. Se pedirem para mandar mensagem, diga que a linha ainda está sendo ativada.`,
 };
 
@@ -235,6 +236,9 @@ const FERRAMENTAS: Record<string, any[]> = {
       lead: str("Nome da empresa ou id."), contato: str("Nome de quem atende."), cargo_contato: str(""), telefone: str(""), email: str(""), instagram: str(""), site: str(""), bairro: str(""),
       dor: str("O problema que o lead quer resolver."), decisor: str("Quem decide."), verba: str(""), prazo: str(""), servico_interesse: str(""), objecoes: str(""), observacoes: str(""),
     }, ["lead"]),
+    T("drive_buscar", "Procura arquivos e pastas no Google Drive pelo nome ou pelo conteúdo. Sem conta, procura no Drive do Jonathan e no da Nostro.", { consulta: str("O que procurar: palavras do nome ou do conteúdo."), conta: { type: "string", enum: ["jonathan", "nostro", "ambas"], description: "Em qual Drive. Padrão: ambas." } }, ["consulta"]),
+    T("drive_ler", "Lê o conteúdo de um arquivo do Drive (documento, planilha, apresentação ou texto). Use o id e a conta que vieram do drive_buscar.", { id: str("id do arquivo."), conta: { type: "string", enum: ["jonathan", "nostro"] } }, ["id", "conta"]),
+    T("drive_salvar", "Cria um arquivo novo no Drive, na pasta Vanessa: um documento (texto) ou uma planilha (conteúdo em CSV, separado por vírgula).", { conta: { type: "string", enum: ["jonathan", "nostro"], description: "Em qual Drive salvar." }, nome: str("Nome do arquivo."), conteudo: str("O texto do documento, ou o CSV da planilha."), tipo: { type: "string", enum: ["documento", "planilha"], description: "Padrão: documento." } }, ["conta", "nome", "conteudo"]),
     T("passar_para_jonathan", "Lead qualificado com reunião marcada: passa para o Jonathan. O Hub cria o negócio no funil dele em Reunião agendada.", {
       lead: str("Nome da empresa ou id."), reuniao_em: str("Data e hora da reunião no horário de Brasília, formato AAAA-MM-DDTHH:MM."), contato: str("Com quem é a reunião."), resumo: str("O que o lead precisa, dor, decisor, verba e prazo."),
     }, ["lead", "reuniao_em", "resumo"]),
@@ -243,7 +247,8 @@ const FERRAMENTAS: Record<string, any[]> = {
 async function usarFerramenta(agente: string, ferramenta: string, args: unknown): Promise<string> {
   try {
     const url = Deno.env.get("SUPABASE_URL"), k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const r = await fetch(`${url}/functions/v1/ferramentas`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
+    const destino = ferramenta.startsWith("drive_") ? "drive-auth" : "ferramentas"; // o Drive tem a função própria
+    const r = await fetch(`${url}/functions/v1/${destino}`, { method: "POST", headers: { "Content-Type": "application/json", "x-segredo": k, Authorization: `Bearer ${k}` }, body: JSON.stringify({ agente, ferramenta, args }) });
     const t = await r.text();
     CACHE.t = 0; // o funil mudou: a lista de leads do próximo pedido vem atualizada
     return t.slice(0, 6000) || JSON.stringify({ erro: "sem resposta" });
